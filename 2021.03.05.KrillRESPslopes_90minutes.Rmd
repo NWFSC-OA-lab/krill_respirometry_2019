@@ -917,7 +917,7 @@ T1dRESPmsr90_DOplot <- ggplot(T1dRESPmsr90,
   geom_point(size = 1) +
   geom_smooth(method = "lm") +
   #scale_y_continuous(breaks=seq(250,950,by=50))   +
-  ggtitle("Trial 01 Percent DO, All Observations Included") +
+  ggtitle("Trial 01 Percent DO timeseries") +
   facet_wrap(~ Treatment) + 
   xlab("Time") +
   ylab("Percent DO") +
@@ -993,6 +993,172 @@ oxyPlotµg_T1dRESPmsr90 + theme(legend.position="bottom", plot.title = element_t
 
 
 
+### 7.2a) PLotting Percent DO filtering Trial 2
+```{r 7.2a) PLotting Percent DO filtering Trial 2, warning=FALSE}
+
+
+T2dRESPmsr90_DOplot <- ggplot(T2dRESPmsr90, 
+                     aes(x = Time, y = percentDO, 
+                         colour = SensorName)) +
+  geom_point(size = 1) +
+  geom_smooth(method = "lm") +
+  #scale_y_continuous(breaks=seq(250,950,by=50))   +
+  ggtitle("Trial 02 Percent DO Timeseries") +
+  facet_wrap(~ Treatment) + 
+  xlab("Time") +
+  ylab("Percent DO") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_hline(yintercept = c(.8), colour = "red") +
+  theme_bw() 
+  # ggsave("Trial01PercentDO_AllObservationsIncluded.png")
+
+T2dRESPmsr90_DOplot
+
+T2dRESPmsr90_DOplot + theme(legend.position="bottom")
+# 
+T2dRESPmsr90_DOplot + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5))
+
+```
+
+
+
+### 7.2b) Trial 2 Vial Oxygen over Time
+```{r 7.2b) Trial 2 Vial Oxygen over Time}
+
+oxyPlotµg_T2dRESPmsr90 <- ggplot(T2dRESPmsr90, aes(x = Time, y = oxygen, colour = KrillID),
+       xlab("Time"),
+       ylab("Oxygen (mg)") ) +
+  geom_point(size = 1) +
+  geom_smooth(method = "lm") +
+  #scale_y_continuous(breaks=seq(250,950,by=50))   +
+  ggtitle("Trial02 Vial Oxygen (µg) Timeseries") +
+  facet_wrap(~ Treatment) + 
+  xlab("Time") +
+  ylab("Oxygen (µg)") +
+  theme_bw()
+
+
+oxyPlotµg_T2dRESPmsr90
+
+oxyPlotµg_T2dRESPmsr90 + theme(legend.position="bottom")
+# 
+oxyPlotµg_T2dRESPmsr90 + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5))
+
+
+```
+
+
+
+
+
+### 7.3a) PLotting Percent DO filtering Trial 3
+```{r 7.3a) PLotting Percent DO filtering Trial 3, warning=FALSE}
+
+
+T3dRESPmsr90_DOplot <- ggplot(T3dRESPmsr90, 
+                     aes(x = Time, y = percentDO, 
+                         colour = SensorName)) +
+  geom_point(size = 1) +
+  geom_smooth(method = "lm") +
+  #scale_y_continuous(breaks=seq(250,950,by=50))   +
+  ggtitle("Trial 03 Percent DO Timeseries") +
+  facet_wrap(~ Treatment) + 
+  xlab("Time") +
+  ylab("Percent DO") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_hline(yintercept = c(.8), colour = "red") +
+  theme_bw() 
+  # ggsave("Trial01PercentDO_AllObservationsIncluded.png")
+
+T3dRESPmsr90_DOplot
+
+T3dRESPmsr90_DOplot + theme(legend.position="bottom")
+# 
+T3dRESPmsr90_DOplot + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5))
+
+```
+
+
+
+
+
+### 7.3b) Trial 3 Vial Oxygen over Time
+```{r 7.3b) Trial 3 Vial Oxygen over Time}
+
+oxyPlotµg_T3dRESPmsr90 <- ggplot(T3dRESPmsr90, aes(x = Time, y = oxygen, colour = KrillID),
+       xlab("Time"),
+       ylab("Oxygen (mg)") ) +
+  geom_point(size = 1) +
+  geom_smooth(method = "lm") +
+  #scale_y_continuous(breaks=seq(250,950,by=50))   +
+  ggtitle("Trial03 Vial Oxygen (µg) Timeseries") +
+  facet_wrap(~ Treatment) + 
+  xlab("Time") +
+  ylab("Oxygen (µg)") +
+  theme_bw()
+
+
+oxyPlotµg_T3dRESPmsr90
+
+oxyPlotµg_T3dRESPmsr90 + theme(legend.position="bottom")
+# 
+oxyPlotµg_T3dRESPmsr90 + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5))
+```
+
+
+
+### 7.4a) PLotting Percent DO filtering Trial 4
+```{r 7.4a) PLotting Percent DO filtering Trial 4, warning=FALSE}
+
+
+T4dRESPmsr90_DOplot <- ggplot(T4dRESPmsr90, 
+                     aes(x = Time, y = percentDO, 
+                         colour = SensorName)) +
+  geom_point(size = 1) +
+  geom_smooth(method = "lm") +
+  #scale_y_continuous(breaks=seq(250,950,by=50))   +
+  ggtitle("Trial 04 Percent DO Timeseries") +
+  facet_wrap(~ Treatment) + 
+  xlab("Time") +
+  ylab("Percent DO") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_hline(yintercept = c(.8), colour = "red") +
+  theme_bw() 
+  # ggsave("Trial01PercentDO_AllObservationsIncluded.png")
+
+T4dRESPmsr90_DOplot
+
+T4dRESPmsr90_DOplot + theme(legend.position="bottom")
+# 
+T4dRESPmsr90_DOplot + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5))
+
+```
+
+
+
+
+### 7.4b) Trial 4 Vial Oxygen over Time
+```{r 7.4b) Trial 4 Vial Oxygen over Time}
+
+oxyPlotµg_T4dRESPmsr90 <- ggplot(T4dRESPmsr90, aes(x = Time, y = oxygen, colour = KrillID),
+       xlab("Time"),
+       ylab("Oxygen (mg)") ) +
+  geom_point(size = 1) +
+  geom_smooth(method = "lm") +
+  #scale_y_continuous(breaks=seq(250,950,by=50))   +
+  ggtitle("Trial04 Vial Oxygen (µg) Timeseries") +
+  facet_wrap(~ Treatment) + 
+  xlab("Time") +
+  ylab("Oxygen (µg)") +
+  theme_bw()
+
+
+oxyPlotµg_T4dRESPmsr90
+
+oxyPlotµg_T4dRESPmsr90 + theme(legend.position="bottom")
+# 
+oxyPlotµg_T4dRESPmsr90 + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5))
+```
 
 
 
