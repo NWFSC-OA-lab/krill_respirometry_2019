@@ -52,6 +52,7 @@ library(lubridate)
 library(tibbletime)
 library(arsenal)
 library(compareDF)
+library(todor)
 #for graphing
 library(ggplot2)
 library(ggfortify)
@@ -71,32 +72,6 @@ library(kableExtra)
 library(todor)
 
 ```
-
-
-*Respirometry and Project End*
-Determining Factors for Project End
-
-*Goals* Our goal is to have 4 lipid samples from each MOAT at the end of the study. A wild cohort was measured for both their size and wet weight. Whole body morts were measured to get a sense of the size for the animals.    
-*End of Study Determinations*. End of the Study was biomass dependent to be able to accomplish Lipid analysis preparation.
-
-In short 72 animals were selected for respirometry. 
-
-
-*Determining how to populate animals into respirometry trials*
-*Krill Doctrine*
-1.	Krill needed to fast for 24hours prior to respirometry and lipids analysis preparation 
-2.	Choose MOATs with the lowest number of animals remaining for the first round(s) of respirometry and follow on preparation for lipids analysis
-3.	Balance between MOATs across days of respirometry*
-4.	Balance between Treatments when choosing which respirometry round
-5.	Must achieve 4 vials per MOATs
-6.	Achieve 15-20 animals across treatments for respirometry
-7.	Wait until Night Time Conditions begin for the Krill to start Respirometry Trials. The night period for krill began at 1230pm. 
-
-![Krill Doctrine Version 1](/Users/katherinerovinski/GIT/NWFSC.MUK_KRL2019respirometrySLOPES/KrillDoctrine1.png)
-
-
-
-![Krill Doctrine Version 1 Explained](/Users/katherinerovinski/GIT/NWFSC.MUK_KRL2019respirometrySLOPES/KrillDoctrine2.png)
 
 
  
@@ -615,7 +590,7 @@ names(dRESPmsr)
 
 
 
-#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
 
 vialVol <- 0.02806 #liters (rather than 28.06mL)
 
@@ -623,6 +598,10 @@ oxygen <- vialVol * dRESPmsr$actualDOmg
 ##mg per liter is the units for Oxygen per vial
 
 dRESPmsr$oxygen <- oxygen * 1000
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  - - - - |
+
+ 
 
 
 ```
@@ -1492,136 +1471,6 @@ kSlopes.filtered <- rbind(T1krillslopes.filtered,
 ```
 
 
-# 16.) Plots Following Filtering
-### 16.1a) Trial 1 Vial Oxygen over Time
-```{r 16.1a) Trial 1 Vial Oxygen over Time}
-
-# T1dTotal original 
-# T1dTotal.filtered outliers removed 
-
-#patchwork
-
-orip1 <- ggplot(T1krillslopes, aes(x = Time, y = oxygen, colour = Treatment)) +
-  geom_point(size = 1) +
-  geom_smooth(method = "lm") +
-  #scale_y_continuous(breaks=seq(250,950,by=50))   +
-  ggtitle("Trial01 Vial Oxygen, with Outliers") +
-  #geom_hline(yintercept = c(.8), colour = "red") +
-  facet_wrap(~ Treatment) + 
-  theme_bw()
-
-
-orip2 <- ggplot(T2krillslopes, aes(x = Time, y = oxygen, colour = Treatment)) +
-  geom_point(size = 1) +
-  geom_smooth(method = "lm") +
-  #scale_y_continuous(breaks=seq(250,950,by=50))   +
-  ggtitle("Trial02 Vial Oxygen, with Outliers") +
-  #geom_hline(yintercept = c(.8), colour = "red") +
-  facet_wrap(~ Treatment) + 
-  theme_bw()
-
-orip3 <- ggplot(T3krillslopes, aes(x = Time, y = oxygen, colour = Treatment)) +
-  geom_point(size = 1) +
-  geom_smooth(method = "lm") +
-  #scale_y_continuous(breaks=seq(250,950,by=50))   +
-  ggtitle("Trial03 Vial Oxygen, with Outliers") +
-  #geom_hline(yintercept = c(.8), colour = "red") +
-  facet_wrap(~ Treatment) + 
-  theme_bw()
-
-
-orip4 <- ggplot(T4krillslopes, aes(x = Time, y = oxygen, colour = Treatment)) +
-  geom_point(size = 1) +
-  geom_smooth(method = "lm") +
-  #scale_y_continuous(breaks=seq(250,950,by=50))   +
-  ggtitle("Trial04 Vial Oxygen, with Outliers") +
-  #geom_hline(yintercept = c(.8), colour = "red") +
-  facet_wrap(~ Treatment) + 
-  theme_bw()
-
-
-# T1krillslopes.filtered outliers removed 
-
-
-filtp1 <- ggplot(T1krillslopes.filtered, aes(x = Time, y = oxygen, colour = Treatment)) +
-  geom_point(size = 1) +
-  geom_smooth(method = "lm") +
-  #scale_y_continuous(breaks=seq(250,950,by=50))   +
-  ggtitle("Trial01 Vial Oxygen, Outliers Filtered") +
-  #geom_hline(yintercept = c(.8), colour = "red") +
-  facet_wrap(~ Treatment) + 
-  theme_bw()
-
-
-filtp2 <- ggplot(T2krillslopes.filtered, aes(x = Time, y = oxygen, colour = Treatment)) +
-  geom_point(size = 1) +
-  geom_smooth(method = "lm") +
-  #scale_y_continuous(breaks=seq(250,950,by=50))   +
-  ggtitle("Trial02 Vial Oxygen, Outliers Filtered") +
-  #geom_hline(yintercept = c(.8), colour = "red") +
-  facet_wrap(~ Treatment) + 
-  theme_bw()
-
-filtp3 <- ggplot(T3krillslopes.filtered, aes(x = Time, y = oxygen, colour = Treatment)) +
-  geom_point(size = 1) +
-  geom_smooth(method = "lm") +
-  #scale_y_continuous(breaks=seq(250,950,by=50))   +
-  ggtitle("Trial03 Vial Oxygen, Outliers Filtered") +
-  #geom_hline(yintercept = c(.8), colour = "red") +
-  facet_wrap(~ Treatment) + 
-  theme_bw()
-
-
-filtp4 <- ggplot(T4krillslopes.filtered, aes(x = Time, y = oxygen, colour = Treatment)) +
-  geom_point(size = 1) +
-  geom_smooth(method = "lm") +
-  #scale_y_continuous(breaks=seq(250,950,by=50))   +
-  ggtitle("Trial04 Vial Oxygen, Outliers Filtered") +
-  #geom_hline(yintercept = c(.8), colour = "red") +
-  facet_wrap(~ Treatment) + 
-  theme_bw()
-
-
-(orip1|filtp1)
-
-
-
-# ((p1|p2)/(p3|p4))|guide_area()+plot_layout(guides = "collect", rel_width=c(4,1))
-
-#((p1|p2)/(p3|p4))|guide_area()+plot_layout(guides = "collect", widths =c(4,1))
-
-#((p1|p2)/(p3|p4))|guide_area()+plot_layout(guides = "collect", widths = c(10, 10, 5))
-
-#(p1|p2)/(p3|p4) + plot_layout(guides= "collect") &  theme(text = element_text(size = 10))
-
-
-#guide_area()
-
-
-```
-
-
-
-## 16.1b After Filtering Trial 02
-```{r 16.1b After Filtering Trial 02}
-(orip2|filtp2)
-
-```
-
-
-## 16.1c After Filtering Trial 03
-```{r 16.1c After Filtering Trial 03}
-(orip3|filtp3)
-
-```
-
-
-
-## 16.1d After Filtering Trial 04
-```{r 16.1d After Filtering Trial 04}
-(orip4|filtp4)
-```
-
 
 
 # 17.x) Analysis, Respirometry - outliers removed (investigating krillslopes)
@@ -1714,7 +1563,22 @@ unique(kSlopes.filtered$KrillID)
 # ks70total 
 # ks1hrtotal 
 
-###  ! ! ! Change all dSlopes to Krill Slopes etc...
+###  dSlopes (Old Example)
+# 
+# dSlopes <- data.frame(KrillID = levels(dtotal$KrillID))
+# # dSlopes$slope <- NA
+# # dSlopes$rsq <- NA
+# 
+# for(i in 1:length(dSlopes$KrillID)){
+#    m <- lm(oxygen ~ delta_t,
+#                          dtotal[dtotal$KrillID == dSlopes$KrillID[i],],
+#                          na.action=na.omit)
+#   dSlopes$slope[i] <- m$coefficients[2]
+#   dSlopes$rsq[i] <- summary(m)$r.squared
+# }
+
+
+# Using " kSlopes.filtered " to only use outlier filtered dataframe.  
 
 df_kSlopes <- data.frame(KrillID = levels(kSlopes.filtered$KrillID))
 # dSlopes$slope <- NA
@@ -1852,7 +1716,7 @@ write.csv(df_kSlopes.summary, "2021.03.08_df_kSlopes_summary.csv")
 
 ggplot(df_kSlopes, aes(Treatment, CorrWeightSlope)) +
             # geom_jitter(color = "grey") +
-            geom_jitter(data = df_kSlopes, aes(Treatment, CorrSlope)) +
+            geom_jitter(data = df_kSlopes, aes(Treatment, CorrWeightSlope)) +
             geom_boxplot(notch = TRUE, outlier.shape = NA, colour = "green") +
             geom_point(data = df_kSlopes.summary, 
                               aes(x=Treatment, y=mean), 
