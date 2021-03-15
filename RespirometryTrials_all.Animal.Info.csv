@@ -67,7 +67,7 @@ Sequence ,FileName,SensorName,MOATS,Treatment,LoadingLocation,GlassVialNumber,Sp
 9,2019.10.29_RESPR_T2,KRLr4_66             ,5,AMB,F1,9,Euphausia pacifica,3.25,0.0385,Trial04
 10,2019.10.29_RESPR_T2,KRLr4_67             ,10,CUR,F5,10,Euphausia pacifica,3.29,0.0602,Trial04
 11,2019.10.29_RESPR_T2,KRLr4_68             ,blank,n/a,G2,11,Euphausia pacifica,n/a,n/a,Trial04
-12,2019.10.29_RESPR_T2,KRLr4_69             ,13,n/a,G4,12,Euphausia pacifica,2.59,0.0252,Trial04
+12,2019.10.29_RESPR_T2,KRLr4_69             ,13,CHG,G4,12,Euphausia pacifica,2.59,0.0252,Trial04
 13,2019.10.29_RESPR_T2,KRLr4_70             ,10,CHG,H1,13,Euphausia pacifica,3.02,0.0315,Trial04
 14,2019.10.29_RESPR_T2,KRLr4_71             ,5,CUR,H3,14,Euphausia pacifica,2.41,0.0179,Trial04
 15,2019.10.29_RESPR_T2,KRLr4_72             ,5,AMB,H5,15,Euphausia pacifica,3.3,0.0327,Trial04

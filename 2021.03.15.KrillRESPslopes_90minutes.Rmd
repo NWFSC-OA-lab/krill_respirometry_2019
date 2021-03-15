@@ -1,0 +1,2506 @@
+
+---
+title: "Respirometry Trials for Summer Krill 2019"
+output:
+ html_document:
+    df_print: paged
+    code_folding: hide
+    toc: TRUE
+    toc_depth: 4
+    toc_float: true
+    theme: cerulean
+    highlight: haddock
+    smart: false
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+Hello World
+
+Author: OA Lab, NWFSC
+Title: Respirometry Trials for Summer Krill 2019
+Date: December 2020 - February 2021
+
+
+# Version Check
+```{r 0.1 Version Check , echo=FALSE, results=FALSE, message=FALSE, warning=FALSE}
+#*********************************
+## Version Check
+#********************************* 
+R.version
+
+```
+
+
+
+# Libraries
+```{r 0.0 Libraries , echo=FALSE, results=FALSE, message=FALSE, warning=FALSE}
+#*********************************
+##Libraries
+#********************************* 
+library(stringr)
+library(tidyverse)
+library(plyr)
+library(nlme)
+library(tidyr)
+library(dbplyr)
+library(dplyr)
+library(purrr)
+library(wql)
+library(lubridate)
+library(tibbletime)
+library(arsenal)
+library(compareDF)
+library(todor)
+#for graphing
+library(ggplot2)
+library(ggfortify)
+library(stringr)
+library(nlme)
+library(RColorBrewer)
+library(patchwork)
+#statistical analysis
+library(gdata)
+library(rsq)
+library(doBy)
+library(lme4)
+library(lmerTest)
+#Rnotebooks 
+library(gridExtra)
+library(kableExtra)
+library(todor)
+#metadata
+library(metacsv)
+
+```
+
+
+ 
+ # 1.) Setting Working Directory
+```{r 1.) Setting Working Directory }
+#*********************************
+## 1.) Setting Working Directory
+#*********************************
+
+#set working directory to the correct folder
+setwd("/Users/katherinerovinski/GIT/NWFSC.MUK_KRL2019respirometrySLOPES")
+```
+
+
+
+# 2.) DF Creation
+```{r 2.) Creating the Dataframe }
+
+#*********************************
+## 2.) Creating the intial Dataframe, dRESP
+#*********************************
+
+## Method 1 - 1 file for the four trials
+#get all the files in the defined working directory that are in csv format  
+dRESP <- read.csv(file = "KRILL_Resp_alltrials.csv", stringsAsFactors = FALSE)
+dim(dRESP)
+
+#write.csv(dRESP, file = "2020.11.30_presenseSENSORONLY.alltrials.data.csv", row.names = FALSE)
+
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+
+# dRESPanimal represents just the animal, vial, MOATs, etc.  
+dRESPanimal <-                                                                              read.csv(file = "RespirometryTrials_all.Animal.Info.csv", 
+                        stringsAsFactors = FALSE) 
+
+dim(dRESPanimal)
+names(dRESPanimal)
+
+dRESPanimal <- droplevels(filter(dRESPanimal, Treatment != "AMB"))
+
+
+library(metacsv)
+# a <- read_meta("RespirometryTrials_all.Animal.Info.csv")
+# get_a <- get_attributes(a)
+
+# a <- get_attributes()
+# write.csv(a$gen_attributes, file = "2021.03.03_attributes.csv")
+# write.csv(a$var_attributes, file = "2021.03.03_var_attributes.csv")
+write.csv(dRESPanimal, file = "2021.03.01_krillanimaldata.csv", row.names = FALSE)
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+
+#dRESPmsr represents the measurements made by the presense optical device for Dissolved Oxygen 
+
+dRESPmsr <- merge(dRESP, 
+                  dRESPanimal, 
+                  by="SensorName")
+
+
+dRESPmsr <- dRESPmsr %>% filter(!MOATS %in% c("3", "4", "5", "11")) %>%
+  filter(Treatment %in% c("CUR", "CHG", "TMP", "n/a"))
+
+dRESPmsr$Treatment[dRESPmsr$Treatment == "n/a" ] <- "blank" 
+unique(dRESPmsr$Treatment)
+# [1] "CUR"   "blank" "TMP"   "CHG" 
+
+write.csv(dRESPmsr, file = "2021.03.01_respirometrymeasurements.csv", row.names = FALSE)
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+
+# dRESP$MOATS <- factor(dRESP$MOATS)
+# Checking the names of the different levels
+# levels(dRESP$MOATS)
+
+
+# dRESPmsr <- dRESPmsr %>% filter(!MOATS %in% c("3", "4", "5", "11")) %>%
+#   filter(Treatment %in% c("CUR", "CHG", "TMP")) 
+# 
+# 
+# dRESPmsr <- dRESPmsr %>% filter(!MOATS %in% c("3", "4", "5", "11")) %>%
+#   filter(Treatment %in% c("CUR", "CHG", "TMP", "n/a")) 
+
+
+```
+
+
+
+
+![Creating dRESPmsr- dataframe](/Users/katherinerovinski/GIT/NWFSC.MUK_KRL2019respirometrySLOPES/Picture1_creatingdRESPmsr.png)
+
+
+
+# 3.) dateTime objects 
+```{r 3.) Creating dateTime objects }
+
+#*********************************
+## 3.) Creating dateTime objects  
+#*********************************
+
+dRESPmsr$dateTime <- ""
+dRESPmsr$dateTime <- as.POSIXct(paste(dRESPmsr$Date,
+                                      dRESPmsr$Time), "%d-%B-%y %H:%M:%S", tz="UTC")
+
+# QA check
+dim(dRESPmsr)
+
+dRESPmsr$Time <- as.POSIXct(dRESPmsr$dateTime, format="%H:%M:%S")
+
+
+```
+
+
+
+# 4.) Observation naming
+```{r 4.) Cleaning up observations }
+#*********************************
+## 4.) Cleaning up observations  
+#********************************
+
+#Removing items with faulty sensor names
+dRESPmsr <- subset(dRESPmsr, SensorName != "")
+
+dRESPmsr$SensorName <- str_trim(dRESPmsr$SensorName, side = c("both"))
+dRESPmsr$SensorName <- factor(dRESPmsr$SensorName)
+dim(dRESPmsr)
+
+dRESPmsr <- subset(dRESPmsr, Value != "---")
+
+# Confirming proper number of krill 
+# 76, 4x19 propoer number of animals under observation 
+unique(dRESPmsr$SensorName)
+UniqueSensorNames <- levels(dRESPmsr$SensorName)
+write.table(UniqueSensorNames, file = "2020.03.01_DRESPmsr_UniqueSensorNames.csv")
+#kable(UniqueSensorNames)
+
+```
+
+
+
+#5.) Trial ID & Krill ID
+```{r 5.) Creating Trial ID & Krill ID,  echo=FALSE, results=FALSE, message=FALSE, warning=FALSE}
+#*********************************
+## 5.) Creating a Krill ID with Trial in name    
+#*********************************
+
+## First Trial began at 2019-10-28 14:25:01
+## First Trial ended at 2019-10-28 16:37:29
+
+## Second Trial began at 2019-10-28 18:55:21
+## Second Trial ended at 2019-10-28 21:16:45
+
+## Third Trial began at 2019-10-29 14:06:21
+## Third Trial ended at 2019-10-29 16:18:36
+
+## Fourth Trial began at 2019-10-29 17:20:21
+## Fourth Trial ended at 2019-10-29 19:32:01
+
+
+dRESPmsr$TrialID <- ""
+dRESPmsr <- dRESPmsr %>% mutate(TrialID=case_when(
+  
+## First Trial began at 2019-10-28 14:25:01
+## First Trial ended at 2019-10-28 16:37:29
+  
+  ((Time >= as.POSIXct("2019-10-28 14:25:00", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 16:37:30", tz = "UTC"))) ~ "Trial01",
+
+  
+## Second Trial began at 2019-10-28 18:55:21
+## Second Trial ended at 2019-10-28 21:16:45  
+  
+  ((Time >= as.POSIXct("2019-10-28 18:55:20", tz = "UTC")) 
+   & (Time <= as.POSIXct("2019-10-28 21:16:50", tz = "UTC"))) ~ "Trial02",
+
+
+## Third Trial began at 2019-10-29 14:06:21
+## Third Trial ended at 2019-10-29 16:18:36
+
+
+  ((Time >= as.POSIXct("2019-10-29 14:06:18", tz = "UTC")) 
+   & (Time <= as.POSIXct("2019-10-29 16:18:40", tz = "UTC"))) ~ "Trial03",
+
+## Fourth Trial began at 2019-10-29 17:20:21
+## Fourth Trial ended at 2019-10-29 19:32:01
+
+  
+  ((Time >= as.POSIXct("2019-10-29 17:20:18", tz = "UTC")) 
+   & (Time <= as.POSIXct("2019-10-29 19:40:01", tz = "UTC"))) ~ "Trial04",
+
+  TRUE ~"other"
+)) 
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+## new value 
+## dRESPmsr$KrillID
+
+dRESPmsr$KrillID <- ""
+
+dRESPmsr$KrillID <- paste(dRESPmsr$TrialID, "_", dRESPmsr$SensorName, sep="")
+#View(dRESPmsr)
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+
+
+```
+
+
+
+## 5.a Round Variable
+```{r 5.a Creating Round Variable,  echo=FALSE, results=FALSE, message=FALSE, warning=FALSE}
+
+#*********************************
+## 5.) Creating the Round Variable to best identify the acclimination period
+#*********************************
+# The acclimination period was detailed as the first 10minutes 
+# Eight Rounds of Respirometry were conducted 
+# Creating the rounds of respirometry to later advise outlier elimination, 
+#                                             data filtering consideration
+# 
+dRESPmsr$RESPRound <- ""
+dRESPmsr <- dRESPmsr %>% mutate(RESPRound=case_when(
+
+# ---TRIAL ONE, ROUND---ONE--- #  
+## First Trial,   Round 1 on 2019-10-28 began 14:25:01
+## First Trial,   Round 1 on 2019-10-28 ended 14:44:00
+  ((Time >= as.POSIXct("2019-10-28 14:25:00", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 14:44:00", tz = "UTC"))) ~ "T1Round1",  
+
+# ---TRIAL ONE, ROUND---TWO--- #
+## First Trial,   Round 2 on 2019-10-28 began 14:44:01
+## First Trial,   Round 2 on 2019-10-28 ended 14:58:59
+  ((Time >= as.POSIXct("2019-10-28 14:44:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 14:58:59", tz = "UTC"))) ~ "T1Round2",  
+
+# ---TRIAL ONE, ROUND---THREE--- #
+## First Trial,   Round 3 on 2019-10-28 began 14:59:00
+## First Trial,   Round 3 on 2019-10-28 ended 15:14:00
+  ((Time >= as.POSIXct("2019-10-28 14:59:00", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 15:14:00", tz = "UTC"))) ~ "T1Round3",   
+
+# ---TRIAL ONE, ROUND---FOUR--- #
+## First Trial,   Round 4 on 2019-10-28 began 15:14:01
+## First Trial,   Round 4 on 2019-10-28 ended 15:29:00
+  ((Time >= as.POSIXct("2019-10-28 15:14:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 15:29:00", tz = "UTC"))) ~ "T1Round4",  
+ 
+# ---TRIAL ONE, ROUND---FIVE--- #
+## First Trial,   Round 5 on 2019-10-28 began 15:29:01
+## First Trial,   Round 5 on 2019-10-28 ended 15:44:00
+  ((Time >= as.POSIXct("2019-10-28 15:29:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 15:44:00", tz = "UTC"))) ~ "T1Round5",  
+
+# ---TRIAL ONE, ROUND---SIX--- #
+## First Trial,   Round 6 on 2019-10-28 began 15:44:01
+## First Trial,   Round 6 on 2019-10-28 ended 15:59:00
+  ((Time >= as.POSIXct("2019-10-28 15:44:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 15:59:00", tz = "UTC"))) ~ "T1Round6", 
+ 
+# ---TRIAL ONE, ROUND---SEVEN--- #
+## First Trial,   Round 7 on 2019-10-28 began 15:59:01
+## First Trial,   Round 7 on 2019-10-28 ended 16:14:00
+  ((Time >= as.POSIXct("2019-10-28 15:59:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 16:14:00", tz = "UTC"))) ~ "T1Round7", 
+ 
+# ---TRIAL ONE, ROUND---EIGHT--- #
+## First Trial,   Round 8 on 2019-10-28 began 16:14:01
+## First Trial,   Round 8 on 2019-10-28 ended 16:29:59
+  ((Time >= as.POSIXct("2019-10-28 16:14:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 16:29:59", tz = "UTC"))) ~ "T1Round8",
+
+####
+
+# ---TRIAL TWO, ROUND---ONE--- #  
+## Second Trial,   Round 1 on 2019-10-28 began 18:50:01
+## Second Trial,   Round 1 on 2019-10-28 ended 19:05:00
+  ((Time >= as.POSIXct("2019-10-28 18:50:00", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 19:05:00", tz = "UTC"))) ~ "T2Round1",  
+
+# ---TRIAL TWO, ROUND---TWO--- #
+## Second Trial,   Round 2 on 2019-10-28 began 19:05:01
+## Second Trial,   Round 2 on 2019-10-28 ended 19:20:00
+  ((Time >= as.POSIXct("2019-10-28 19:05:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 19:20:00", tz = "UTC"))) ~ "T2Round2",  
+
+# ---TRIAL TWO, ROUND---THREE--- #
+## Second Trial,   Round 3 on 2019-10-28 began 19:20:01
+## Second Trial,   Round 3 on 2019-10-28 ended 19:35:00
+  ((Time >= as.POSIXct("2019-10-28 19:20:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 19:35:00", tz = "UTC"))) ~ "T2Round3",   
+
+# ---TRIAL TWO, ROUND---FOUR--- #
+## Second Trial,   Round 4 on 2019-10-28 began 19:35:01
+## Second Trial,   Round 4 on 2019-10-28 ended 19:50:00
+  ((Time >= as.POSIXct("2019-10-28 19:35:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 19:50:00", tz = "UTC"))) ~ "T2Round4",  
+ 
+# ---TRIAL TWO, ROUND---FIVE--- #
+## Second Trial,   Round 5 on 2019-10-28 began 19:50:01
+## Second Trial,   Round 5 on 2019-10-28 ended 20:05:00
+  ((Time >= as.POSIXct("2019-10-28 19:50:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 20:05:00", tz = "UTC"))) ~ "T2Round5",  
+
+# ---TRIAL TWO, ROUND---SIX--- #
+## Second Trial,   Round 6 on 2019-10-28 began 20:05:01
+## Second Trial,   Round 6 on 2019-10-28 ended 20:20:00
+  ((Time >= as.POSIXct("2019-10-28 20:05:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 20:20:00", tz = "UTC"))) ~ "T2Round6", 
+ 
+# ---TRIAL TWO, ROUND---SEVEN--- #
+## Second Trial,   Round 7 on 2019-10-28 began 20:20:01
+## Second Trial,   Round 7 on 2019-10-28 ended 20:35:00
+  ((Time >= as.POSIXct("2019-10-28 20:20:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 20:35:00", tz = "UTC"))) ~ "T2Round7", 
+ 
+# ---TRIAL TWO, ROUND---EIGHT--- #
+## Second Trial,   Round 8 on 2019-10-28 began 20:35:01
+## Second Trial,   Round 8 on 2019-10-28 ended 20:50:59
+  ((Time >= as.POSIXct("2019-10-28 20:35:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 20:50:59", tz = "UTC"))) ~ "T2Round8",
+
+
+###
+
+
+# ---TRIAL THREE, ROUND---ONE--- #  
+## Second Trial,   Round 1 on 2019-10-29 began 14:00:01
+## Second Trial,   Round 1 on 2019-10-29 ended 14:10:00
+  ((Time >= as.POSIXct("2019-10-29 14:00:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 14:10:00", tz = "UTC"))) ~ "T3Round1",  
+
+# ---TRIAL THREE, ROUND---TWO--- #
+## Second Trial,   Round 2 on 2019-10-29 began 14:10:01
+## Second Trial,   Round 2 on 2019-10-29 ended 14:25:00
+  ((Time >= as.POSIXct("2019-10-29 14:10:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 14:25:00", tz = "UTC"))) ~ "T3Round2",  
+
+# ---TRIAL THREE, ROUND---THREE--- #
+## Second Trial,   Round 3 on 2019-10-29 began 14:25:01
+## Second Trial,   Round 3 on 2019-10-29 ended 14:40:00
+  ((Time >= as.POSIXct("2019-10-29 14:25:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 14:40:00", tz = "UTC"))) ~ "T3Round3",   
+
+# ---TRIAL THREE, ROUND---FOUR--- #
+## Second Trial,   Round 4 on 2019-10-29 began 14:40:01
+## Second Trial,   Round 4 on 2019-10-29 ended 14:55:00
+  ((Time >= as.POSIXct("2019-10-29 14:40:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 14:55:00", tz = "UTC"))) ~ "T3Round4",  
+ 
+# ---TRIAL THREE, ROUND---FIVE--- #
+## Second Trial,   Round 5 on 2019-10-29 began 14:55:01
+## Second Trial,   Round 5 on 2019-10-29 ended 15:10:00
+  ((Time >= as.POSIXct("2019-10-29 14:55:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 15:10:00", tz = "UTC"))) ~ "T3Round5",  
+
+# ---TRIAL THREE, ROUND---SIX--- #
+## Second Trial,   Round 6 on 2019-10-29 began 15:10:01
+## Second Trial,   Round 6 on 2019-10-29 ended 15:25:00
+  ((Time >= as.POSIXct("2019-10-29 15:10:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 15:25:00", tz = "UTC"))) ~ "T3Round6", 
+ 
+# ---TRIAL THREE, ROUND---SEVEN--- #
+## Second Trial,   Round 7 on 2019-10-29 began 15:25:01
+## Second Trial,   Round 7 on 2019-10-29 ended 15:40:00
+  ((Time >= as.POSIXct("2019-10-29 15:25:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 15:40:00", tz = "UTC"))) ~ "T3Round7", 
+ 
+# ---TRIAL THREE, ROUND---EIGHT--- #
+## Second Trial,   Round 8 on 2019-10-29 began 15:40:01
+## Second Trial,   Round 8 on 2019-10-29 ended 15:55:59
+  ((Time >= as.POSIXct("2019-10-29 15:40:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 15:55:59", tz = "UTC"))) ~ "T3Round8",
+
+
+###
+
+
+# ---TRIAL FOUR, ROUND---ONE--- #  
+## Second Trial,   Round 1 on 2019-10-29 began 17:23:01
+## Second Trial,   Round 1 on 2019-10-29 ended 17:38:00
+  ((Time >= as.POSIXct("2019-10-29 17:23:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 17:38:00", tz = "UTC"))) ~ "T4Round1",  
+
+# ---TRIAL FOUR, ROUND---TWO--- #
+## Second Trial,   Round 2 on 2019-10-29 began 17:38:01
+## Second Trial,   Round 2 on 2019-10-29 ended 17:53:00
+  ((Time >= as.POSIXct("2019-10-29 17:38:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 17:53:00", tz = "UTC"))) ~ "T4Round2",  
+
+# ---TRIAL FOUR, ROUND---THREE--- #
+## Second Trial,   Round 3 on 2019-10-29 began 17:53:01
+## Second Trial,   Round 3 on 2019-10-29 ended 18:08:00
+  ((Time >= as.POSIXct("2019-10-29 17:53:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 18:08:00", tz = "UTC"))) ~ "T4Round3",   
+
+# ---TRIAL FOUR, ROUND---FOUR--- #
+## Second Trial,   Round 4 on 2019-10-29 began 18:08:01
+## Second Trial,   Round 4 on 2019-10-29 ended 18:23:00
+  ((Time >= as.POSIXct("2019-10-29 18:08:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 18:23:00", tz = "UTC"))) ~ "T4Round4",  
+ 
+# ---TRIAL FOUR, ROUND---FIVE--- #
+## Second Trial,   Round 5 on 2019-10-29 began 18:23:01
+## Second Trial,   Round 5 on 2019-10-29 ended 18:38:00
+  ((Time >= as.POSIXct("2019-10-29 18:23:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 18:38:00", tz = "UTC"))) ~ "T4Round5",  
+
+# ---TRIAL FOUR, ROUND---SIX--- #
+## Second Trial,   Round 6 on 2019-10-29 began 18:38:01
+## Second Trial,   Round 6 on 2019-10-29 ended 18:53:00
+  ((Time >= as.POSIXct("2019-10-29 18:38:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 18:53:00", tz = "UTC"))) ~ "T4Round6", 
+ 
+# ---TRIAL FOUR, ROUND---SEVEN--- #
+## Second Trial,   Round 7 on 2019-10-29 began 18:53:01
+## Second Trial,   Round 7 on 2019-10-29 ended 19:08:00
+  ((Time >= as.POSIXct("2019-10-29 18:53:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 19:08:00", tz = "UTC"))) ~ "T4Round7", 
+ 
+# ---TRIAL FOUR, ROUND---EIGHT--- #
+## Second Trial,   Round 8 on 2019-10-29 began 19:08:01
+## Second Trial,   Round 8 on 2019-10-29 ended 19:23:59
+  ((Time >= as.POSIXct("2019-10-29 19:08:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 19:23:59", tz = "UTC"))) ~ "T4Round8",
+
+  TRUE ~"other"
+)) 
+
+
+as.factor(dRESPmsr$RESPRound)
+#levels(dRESPmsr$RESPRound)
+
+```
+
+
+
+## 5.b KrillID (grp & time)
+```{r 5.b Grouping by KrillID and then by Time, echo=FALSE, results=FALSE, message=FALSE, warning=FALSE}
+#Grouping by KrillID
+dRESPmsr <- dRESPmsr %>% group_by(KrillID)
+#Order Chronologically
+# dRESPmsr <- dRESPmsr %>% group_by(Time)
+# dRESPmsr <- dRESPmsr [order(as.Date(dRESPmsr$Time, format="%d-%B-%y %H:%M:%S", tz="UTC")),]
+# #Will print tibble
+# dRESPmsr [order(as.Date(dRESPmsr$Time, format="%d-%B-%y %H:%M:%S", tz="UTC")),]
+# dRESPmsr <- dRESPmsr %>% arrange(dRESPmsr(Time), .by_group = TRUE)
+# dRESPmsr <- dRESPmsr %>%
+#   mutate(date = as.Date(dRESPmsr$Time, "%d-%B-%y %H:%M:%S")) %>%
+#   arrange(date)
+# dRESPmsr %>%
+#   mutate(date = as.Date(dRESPmsr$Time, "%d-%B-%y %H:%M:%S")) %>%
+#   arrange(date)
+dRESPmsr <- dRESPmsr[order(dRESPmsr$Time),]
+dRESPmsr[order(dRESPmsr$Time),]
+#Organize by Round
+
+# per minute unit
+dRESPmsr$delta_t <- (dRESPmsr$delta_t)/60
+
+dRESPmsr$Unit <- as.character(dRESPmsr$Unit)
+dRESPmsr$Unit <- "hour"
+
+```
+
+
+
+# 6.) DO Corrections
+```{r 6.) DO trial 3 correction applied to all rounds}
+#*********************************
+## 6.) DO trial 3 correction applied to all rounds   
+#*********************************
+
+# New values to correct the DO values for the temperature in Trial 3 in the dataframe dRESPmsr
+
+dRESPmsr$percentDOassumpt <- ""
+dRESPmsr$assumedSatDOmg <- ""
+dRESPmsr$percentDO <- ""
+dRESPmsr$obseveredSatDOmg <- ""
+dRESPmsr$actualDOmg <- ""
+
+dRESPmsr$percentDOassumpt <- as.numeric(dRESPmsr$percentDOassumpt)
+dRESPmsr$assumedSatDOmg <- as.numeric(dRESPmsr$assumedSatDOmg)
+dRESPmsr$percentDO <- as.numeric(dRESPmsr$percentDO)
+dRESPmsr$obseveredSatDOmg <- as.numeric(dRESPmsr$obseveredSatDOmg)
+dRESPmsr$actualDOmg <- as.numeric(dRESPmsr$actualDOmg)
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+#Correct Temperature
+dRESPmsr$CorTemp <- 11
+
+#Salinity Constant
+dRESPmsr$SalinityConstant <- 30.3
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+# Numeric Corrections to DO value
+dRESPmsr$Value <- as.numeric(dRESPmsr$Value)
+
+dRESPmsr$assumedSatDOmg <- oxySol(dRESPmsr$CorTemp, 
+                                  dRESPmsr$SalinityConstant)
+
+dRESPmsr$percentDOassumpt <- dRESPmsr$Value / dRESPmsr$assumedSatDOmg
+
+dRESPmsr$obseveredSatDOmg <- oxySol(dRESPmsr$CorTemp, dRESPmsr$SalinityConstant)
+
+dRESPmsr$percentDO <- dRESPmsr$Value / dRESPmsr$assumedSatDOmg
+
+dRESPmsr$actualDOmg <- dRESPmsr$percentDO * dRESPmsr$obseveredSatDOmg
+
+names(dRESPmsr)
+
+
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+vialVol <- 0.02806 #liters (rather than 28.06mL)
+
+oxygen <- vialVol * dRESPmsr$actualDOmg   
+##mg per liter is the units for Oxygen per vial
+
+dRESPmsr$oxygen <- oxygen * 1000
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  - - - - |
+
+ 
+
+
+```
+
+
+
+# 6.a) DO table & DO correction Plot Check
+```{r 6.a) DO table & DO correction Plot Check  }
+#*********************************
+## 6.a) DO table & DO correction Plot Check  
+#*********************************
+
+# # write.table(dRESPmsr, file = "2020.11.06.dRESPmeasurements", sep=";", 
+# #             row.names = TRUE)
+# # 
+# # dRESPmsr <-subset(dRESPmsr, actualDOmg != "---")
+# # dRESPmsr$Time <- as.POSIXct(dRESPmsr$Time, format="%H:%M:%S")
+# ggplot(dRESPmsr, aes(x = Time, y = actualDOmg, colour = SensorName)) +
+#   geom_point(size = 1) +
+#   geom_smooth(method = "lm") +
+#   facet_wrap(~TrialID) +
+#   #scale_y_continuous(breaks=seq(250,950,by=50))   +
+#   theme_bw()
+
+```
+
+## 6.b DO Selections
+```{r 6.b) DO Selections 80% and 70% }
+#*********************************
+## 6.a) DO table & DO correction Plot Check  
+#*********************************
+
+# 
+# # Select by trial first
+# T1dRESPmsr <- filter(dRESPmsr, TrialID == "Trial01")
+# T2dRESPmsr <- filter(dRESPmsr, TrialID == "Trial02")
+# T3dRESPmsr <- filter(dRESPmsr, TrialID == "Trial03")
+# T4dRESPmsr <- filter(dRESPmsr, TrialID == "Trial04")
+
+
+```
+
+
+
+# 7.) 90minute Dataframe (selection) Removing AMB and selecting the timeframe
+```{r 90minute Dataframe (selection), 4 dataframes}
+
+#Removing AMB treatment
+#Separating and the merging data by Trial
+
+T1dRESPmsr90 <- filter(dRESPmsr, TrialID == "Trial01")
+T1dRESPmsr90 <- droplevels(filter(T1dRESPmsr90, Treatment != "AMB"))
+T1dRESPmsr90  <- T1dRESPmsr90 [order(T1dRESPmsr90$Time),]
+head(T1dRESPmsr90$Time)
+# "2019-10-28 14:25:01 UTC"
+
+T1dRESPmsr90 <- filter(T1dRESPmsr90, 
+                        Time <= as.POSIXct("2019-10-28 15:55:01", tz = "UTC"))
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+T2dRESPmsr90 <- filter(dRESPmsr, TrialID == "Trial02")
+T2dRESPmsr90 <- droplevels(filter(T2dRESPmsr90, Treatment != "AMB"))
+T2dRESPmsr90  <- T2dRESPmsr90 [order(T2dRESPmsr90$Time),]
+head(T2dRESPmsr90$Time)
+# "2019-10-28 18:55:21 UTC"
+
+T2dRESPmsr90 <- filter(T2dRESPmsr90, 
+                        Time <= as.POSIXct("2019-10-28 20:25:00", tz = "UTC"))
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+T3dRESPmsr90 <- filter(dRESPmsr, TrialID == "Trial03")
+T3dRESPmsr90 <- droplevels(filter(T3dRESPmsr90, Treatment != "AMB"))
+T3dRESPmsr90  <- T3dRESPmsr90 [order(T3dRESPmsr90$Time),]
+head(T3dRESPmsr90$Time)
+# "2019-10-29 14:06:22 UTC"
+
+T3dRESPmsr90 <- filter(T3dRESPmsr90, 
+                        Time <= as.POSIXct("2019-10-29 15:36:00", tz = "UTC"))
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+T4dRESPmsr90 <- filter(dRESPmsr, TrialID == "Trial04")
+T4dRESPmsr90 <- droplevels(filter(T4dRESPmsr90, Treatment != "AMB"))
+T4dRESPmsr90  <- T4dRESPmsr90 [order(T4dRESPmsr90$Time),]
+head(T4dRESPmsr90$Time)
+# "2019-10-29 17:20:22 UTC" 
+
+T4dRESPmsr90 <- filter(T4dRESPmsr90, 
+                        Time <= as.POSIXct("2019-10-29 18:50:00", tz = "UTC"))
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+
+
+
+```
+
+
+#### 7.a) Trial Tables
+```{r 7.a Particulars per Trial}
+
+# Particulars about each trial
+## Trial 01
+
+T1dRESPmsr90_UniqueVials <- unique(T1dRESPmsr90$KrillID)
+# T1dRESPmsr90_UniqueVials <- droplevels(filter(T1dRESPmsr90_UniqueVials, Treatment != "n/a"))
+## 19 Animals in Trial 01
+Trial1Animals <- 19
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+#*********************************
+## Trial # 1  
+#*********************************
+# Treatments Inside of Trials
+T1dRESPmsr90_treatmentquery_AMB <- filter(T1dRESPmsr90, Treatment == "AMB")
+unique(T1dRESPmsr90_treatmentquery_AMB$KrillID)
+## QA Check zero AMB animals
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+T1dRESPmsr90_treatmentquery_CHG <- filter(T1dRESPmsr90, Treatment == "CHG")
+unique(T1dRESPmsr90_treatmentquery_CHG$KrillID)
+# [1] "Trial01_KrilLR16" 
+# [2] "Trial01_KrilLR17" 
+# [3] "Trial01_KrILR110"
+# [4] "Trial01_KriLR116" 
+# [5] "Trial01_KriLR117"
+## 4 animals from All Change
+Trial1_CHG <- 5
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+T1dRESPmsr90_treatmentquery_CUR <- filter(T1dRESPmsr90, Treatment == "CUR")
+unique(T1dRESPmsr90_treatmentquery_CUR$KrillID)
+# [1] "Trial01_KrilLR11" 
+# [2] "Trial01_KrilLR13" 
+# [3] "Trial01_KrilLR18"
+# [4] "Trial01_KriLR114"
+## 4 animals from Current Conditions
+Trial1_CUR <- 4
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+T1dRESPmsr90_treatmentquery_TMP <- filter(T1dRESPmsr90, Treatment == "TMP")
+unique(T1dRESPmsr90_treatmentquery_TMP$KrillID)
+# [1] "Trial01_KrilLR14" 
+# [2] "Trial01_KrilLR15" 
+# [3] "Trial01_KriLR111"
+# [4] "Trial01_KriLR112" 
+# [5] "Trial01_KriLR113" 
+# [6] "Trial01_KriLR115"
+# [7] "Trial01_KriLR118" 
+# [8] "Trial01_KriLR119"
+Trial1_TMP <- 8
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+Trial1_Blanks <- 2
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+trial1Table <- data.frame(Trial1Animals, Trial1_CHG, Trial1_CUR, Trial1_TMP, Trial1_Blanks)
+write.csv(trial1Table, "2021.03.05_RespirometryTrial01Table.csv")
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+#*********************************
+## Trial # 2  
+#*********************************
+
+unique(T2dRESPmsr90$KrillID)
+#  [1] "Trial02_KriLR220" "Trial02_KriLR223" "Trial02_KriLR224"
+#  [4] "Trial02_KriLR226" "Trial02_KriLR227" "Trial02_KriLR229"
+#  [7] "Trial02_KriLR230" "Trial02_KriLR232" "Trial02_KriLR233"
+# [10] "Trial02_KriLR234" 
+# [11] "Trial02_KriLR235"
+Trial2Animals <- 11
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+T2dRESPmsr90_treatmentquery_CHG <- filter(T2dRESPmsr90, Treatment == "CHG")
+unique(T2dRESPmsr90_treatmentquery_CHG$KrillID)
+# [1] "Trial02_KriLR223" 
+# [2] "Trial02_KriLR227" 
+# [3] "Trial02_KriLR229"
+# [4] "Trial02_KriLR233" 
+# [5] "Trial02_KriLR235"
+Trial2_CHG <- 5
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+T2dRESPmsr90_treatmentquery_CUR <- filter(T2dRESPmsr90, Treatment == "CUR")
+unique(T2dRESPmsr90_treatmentquery_CUR$KrillID)
+# [1] "Trial02_KriLR220" "Trial02_KriLR226" "Trial02_KriLR232"
+# [4] "Trial02_KriLR234"
+Trial2_CUR <- 4
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+T2dRESPmsr90_treatmentquery_TMP <- filter(T2dRESPmsr90, Treatment == "TMP")
+unique(T2dRESPmsr90_treatmentquery_TMP$KrillID)
+# character(0)
+Trial2_TMP <- 0
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+Trial2_Blanks <- 2
+trial2Table <- data.frame(Trial2Animals, Trial2_CHG, Trial2_CUR, Trial2_TMP, Trial2_Blanks)
+write.csv(trial2Table, "2021.03.05_RespirometryTrial02Table.csv")
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+
+#*********************************
+## Trial # 3  
+#*********************************
+
+unique(T3dRESPmsr90$KrillID)
+#  [1] "Trial03_KRLr3_39" "Trial03_KRLr3_40" "Trial03_KRLr3_41"
+#  [4] "Trial03_KRLr3_42" "Trial03_KRLr3_43" "Trial03_KRLr3_44"
+#  [7] "Trial03_KRLr3_45" "Trial03_KRLr3_46" "Trial03_KRLr3_47"
+# [10] "Trial03_KRLr3_48" "Trial03_KRLr3_49" "Trial03_KRLr3_50"
+# [13] "Trial03_KRLr3_51" "Trial03_KRLr3_52" "Trial03_KRLr3_53"
+# [16] "Trial03_KRLr3_54" "Trial03_KRLr3_55" "Trial03_KRLr3_56"
+# [19] "Trial03_KRLr3_57"
+Trial3Animals <- 19
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+
+T3dRESPmsr90_treatmentquery_CHG <- filter(T3dRESPmsr90, Treatment == "CHG")
+unique(T3dRESPmsr90_treatmentquery_CHG$KrillID)
+# [1] "Trial03_KRLr3_42" 
+# [2] "Trial03_KRLr3_46" 
+# [3] "Trial03_KRLr3_48"
+# [4] "Trial03_KRLr3_53" 
+# [5] "Trial03_KRLr3_56"
+Trial3_CHG <- 5
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+T3dRESPmsr90_treatmentquery_CUR <- filter(T3dRESPmsr90, Treatment == "CUR")
+unique(T3dRESPmsr90_treatmentquery_CUR$KrillID)
+# [1] "Trial03_KRLr3_41" 
+# [2] "Trial03_KRLr3_47" 
+# [3] "Trial03_KRLr3_51"
+# [4] "Trial03_KRLr3_57"
+Trial3_CUR <- 4
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+T3dRESPmsr90_treatmentquery_TMP <- filter(T3dRESPmsr90, Treatment == "TMP")
+unique(T3dRESPmsr90_treatmentquery_TMP$KrillID)
+# [1] "Trial03_KRLr3_39" "Trial03_KRLr3_40" "Trial03_KRLr3_44"
+# [4] "Trial03_KRLr3_45" "Trial03_KRLr3_49" "Trial03_KRLr3_50"
+# [7] "Trial03_KRLr3_54" 
+# [8] "Trial03_KRLr3_55"
+Trial3_TMP <- 8
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+Trial3_Blanks <- 2
+trial3Table <- data.frame(Trial3Animals, Trial3_CHG, Trial3_CUR, Trial3_TMP, Trial3_Blanks)
+write.csv(trial3Table, "2021.03.05_RespirometryTrial03Table.csv")
+
+unique(T3dRESPmsr90$KrillID)
+unique(T4dRESPmsr90$KrillID)
+
+
+#*********************************
+## Trial # 4  
+#*********************************
+unique(T4dRESPmsr90$KrillID)
+#  [1] "Trial04_KRLr4_58" "Trial04_KRLr4_59" "Trial04_KRLr4_62"
+#  [4] "Trial04_KRLr4_65" "Trial04_KRLr4_67" "Trial04_KRLr4_68"
+#  [7] "Trial04_KRLr4_69" "Trial04_KRLr4_70" "Trial04_KRLr4_71"
+# [10] "Trial04_KRLr4_75" 
+# [11] "Trial04_KRLr4_76"
+Trial4Animals <- 11
+
+T4dRESPmsr90_treatmentquery_CHG <- filter(T4dRESPmsr90, Treatment == "CHG")
+unique(T4dRESPmsr90_treatmentquery_CHG$KrillID)
+# [1] "Trial04_KRLr4_70"
+Trial4_CHG <- 1
+
+T4dRESPmsr90_treatmentquery_CUR <- filter(T4dRESPmsr90, Treatment == "CUR")
+unique(T4dRESPmsr90_treatmentquery_CUR$KrillID)
+# [1] "Trial04_KRLr4_58" "Trial04_KRLr4_62" "Trial04_KRLr4_65"
+# [4] "Trial04_KRLr4_67" "Trial04_KRLr4_71" "Trial04_KRLr4_75"
+# [7] "Trial04_KRLr4_76"
+Trial4_CUR <- 7
+
+T4dRESPmsr90_treatmentquery_TMP <- filter(T4dRESPmsr90, Treatment == "TMP")
+unique(T4dRESPmsr90_treatmentquery_TMP$KrillID)
+Trial4_TMP <- 0
+
+
+Trial4_Blanks <- 2
+trial4Table <- data.frame(Trial4Animals, Trial4_CHG, Trial4_CUR, Trial4_TMP, Trial4_Blanks)
+write.csv(trial4Table, "2021.03.05_RespirometryTrial04Table.csv")
+
+
+
+```
+
+
+
+## Trial01 Loading Map
+![Trial01 Loading Map](/Users/katherinerovinski/GIT/NWFSC.MUK_KRL2019respirometrySLOPES/Trial01of2(2019.10.28)respirometry.png)
+
+
+### 7.1a) PLotting Percent DO filtering Trial 1
+```{r 7.1a) PLotting Percent DO filtering Trial 1, warning=FALSE}
+
+
+T1dRESPmsr90_DOplot <- ggplot(T1dRESPmsr90, 
+                     aes(x = Time, y = percentDO, 
+                         colour = SensorName)) +
+  geom_point(size = 1) +
+  geom_smooth(method = "lm") +
+  #scale_y_continuous(breaks=seq(250,950,by=50))   +
+  ggtitle("Trial 01 Percent DO timeseries") +
+  facet_wrap(~ Treatment) + 
+  xlab("Time") +
+  ylab("Percent DO") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_hline(yintercept = c(.8), colour = "red") +
+  theme_bw() 
+  # ggsave("Trial01PercentDO_AllObservationsIncluded.png")
+
+T1dRESPmsr90_DOplot
+
+T1dRESPmsr90_DOplot + theme(legend.position="bottom")
+# 
+T1dRESPmsr90_DOplot + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5))
+
+```
+
+
+
+
+
+### 7.1a2) PLotting Percent DO filtering Trial 1 Colored by Round
+```{r 7.1a2) PLotting Percent DO filtering Trial 1, warning=FALSE}
+
+
+
+ztrial01DOrounds <- ggplot(T1dRESPmsr90, 
+                           aes(x = Time, y = percentDO, 
+                               colour = T1dRESPmsr90$RESPRound)) +
+  geom_point(size = 1) +
+  geom_smooth(method = "lm") +
+  #scale_y_continuous(breaks=seq(250,950,by=50))   +
+  ggtitle("Trial01 Percent DO (Rounds Highlighted)") +
+    facet_wrap(~ Treatment) + 
+  xlab("Time") +
+  ylab("Percent DO") +
+  geom_hline(yintercept = c(.8), colour = "red") +
+  theme_bw()
+
+ztrial01DOrounds
+
+ztrial01DOrounds + theme(legend.position="bottom")
+# 
+ztrial01DOrounds + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5))
+
+
+```
+
+### 7.1b) Trial 1 Vial Oxygen over Time
+```{r 7.1b) Trial 1 Vial Oxygen over Time}
+
+oxyPlotµg_T1dRESPmsr90 <- ggplot(T1dRESPmsr90, aes(x = Time, y = oxygen, colour = KrillID),
+       xlab("Time"),
+       ylab("Oxygen (mg)") ) +
+  geom_point(size = 1) +
+  geom_smooth(method = "lm") +
+  #scale_y_continuous(breaks=seq(250,950,by=50))   +
+  ggtitle("Trial01 Vial Oxygen (µg) Timeseries") +
+  facet_wrap(~ Treatment) + 
+  xlab("Time") +
+  ylab("Oxygen (µg)") +
+  theme_bw()
+
+
+oxyPlotµg_T1dRESPmsr90
+
+oxyPlotµg_T1dRESPmsr90 + theme(legend.position="bottom")
+# 
+oxyPlotµg_T1dRESPmsr90 + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5))
+
+
+```
+
+
+
+
+### 7.2a) PLotting Percent DO filtering Trial 2
+```{r 7.2a) PLotting Percent DO filtering Trial 2, warning=FALSE}
+
+
+T2dRESPmsr90_DOplot <- ggplot(T2dRESPmsr90, 
+                     aes(x = Time, y = percentDO, 
+                         colour = SensorName)) +
+  geom_point(size = 1) +
+  geom_smooth(method = "lm") +
+  #scale_y_continuous(breaks=seq(250,950,by=50))   +
+  ggtitle("Trial 02 Percent DO Timeseries") +
+  facet_wrap(~ Treatment) + 
+  xlab("Time") +
+  ylab("Percent DO") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_hline(yintercept = c(.8), colour = "red") +
+  theme_bw() 
+  # ggsave("Trial01PercentDO_AllObservationsIncluded.png")
+
+T2dRESPmsr90_DOplot
+
+T2dRESPmsr90_DOplot + theme(legend.position="bottom")
+# 
+T2dRESPmsr90_DOplot + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5))
+
+```
+
+
+
+### 7.2b) Trial 2 Vial Oxygen over Time
+```{r 7.2b) Trial 2 Vial Oxygen over Time}
+
+oxyPlotµg_T2dRESPmsr90 <- ggplot(T2dRESPmsr90, aes(x = Time, y = oxygen, colour = KrillID),
+       xlab("Time"),
+       ylab("Oxygen (mg)") ) +
+  geom_point(size = 1) +
+  geom_smooth(method = "lm") +
+  #scale_y_continuous(breaks=seq(250,950,by=50))   +
+  ggtitle("Trial02 Vial Oxygen (µg) Timeseries") +
+  facet_wrap(~ Treatment) + 
+  xlab("Time") +
+  ylab("Oxygen (µg)") +
+  theme_bw()
+
+
+oxyPlotµg_T2dRESPmsr90
+
+oxyPlotµg_T2dRESPmsr90 + theme(legend.position="bottom")
+# 
+oxyPlotµg_T2dRESPmsr90 + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5))
+
+
+```
+
+
+
+
+
+### 7.3a) PLotting Percent DO filtering Trial 3
+```{r 7.3a) PLotting Percent DO filtering Trial 3, warning=FALSE}
+
+
+T3dRESPmsr90_DOplot <- ggplot(T3dRESPmsr90, 
+                     aes(x = Time, y = percentDO, 
+                         colour = SensorName)) +
+  geom_point(size = 1) +
+  geom_smooth(method = "lm") +
+  #scale_y_continuous(breaks=seq(250,950,by=50))   +
+  ggtitle("Trial 03 Percent DO Timeseries") +
+  facet_wrap(~ Treatment) + 
+  xlab("Time") +
+  ylab("Percent DO") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_hline(yintercept = c(.8), colour = "red") +
+  theme_bw() 
+  # ggsave("Trial01PercentDO_AllObservationsIncluded.png")
+
+T3dRESPmsr90_DOplot
+
+T3dRESPmsr90_DOplot + theme(legend.position="bottom")
+# 
+T3dRESPmsr90_DOplot + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5))
+
+```
+
+
+
+
+
+### 7.3b) Trial 3 Vial Oxygen over Time
+```{r 7.3b) Trial 3 Vial Oxygen over Time}
+
+oxyPlotµg_T3dRESPmsr90 <- ggplot(T3dRESPmsr90, aes(x = Time, y = oxygen, colour = KrillID),
+       xlab("Time"),
+       ylab("Oxygen (mg)") ) +
+  geom_point(size = 1) +
+  geom_smooth(method = "lm") +
+  #scale_y_continuous(breaks=seq(250,950,by=50))   +
+  ggtitle("Trial03 Vial Oxygen (µg) Timeseries") +
+  facet_wrap(~ Treatment) + 
+  xlab("Time") +
+  ylab("Oxygen (µg)") +
+  theme_bw()
+
+
+oxyPlotµg_T3dRESPmsr90
+
+oxyPlotµg_T3dRESPmsr90 + theme(legend.position="bottom")
+# 
+oxyPlotµg_T3dRESPmsr90 + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5))
+```
+
+
+
+### 7.4a) PLotting Percent DO filtering Trial 4
+```{r 7.4a) PLotting Percent DO filtering Trial 4, warning=FALSE}
+
+
+T4dRESPmsr90_DOplot <- ggplot(T4dRESPmsr90, 
+                     aes(x = Time, y = percentDO, 
+                         colour = SensorName)) +
+  geom_point(size = 1) +
+  geom_smooth(method = "lm") +
+  #scale_y_continuous(breaks=seq(250,950,by=50))   +
+  ggtitle("Trial 04 Percent DO Timeseries") +
+  facet_wrap(~ Treatment) + 
+  xlab("Time") +
+  ylab("Percent DO") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_hline(yintercept = c(.8), colour = "red") +
+  theme_bw() 
+  # ggsave("Trial01PercentDO_AllObservationsIncluded.png")
+
+T4dRESPmsr90_DOplot
+
+T4dRESPmsr90_DOplot + theme(legend.position="bottom")
+# 
+T4dRESPmsr90_DOplot + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5))
+
+```
+
+
+
+
+### 7.4b) Trial 4 Vial Oxygen over Time
+```{r 7.4b) Trial 4 Vial Oxygen over Time}
+
+oxyPlotµg_T4dRESPmsr90 <- ggplot(T4dRESPmsr90, aes(x = Time, y = oxygen, colour = KrillID),
+       xlab("Time"),
+       ylab("Oxygen (mg)") ) +
+  geom_point(size = 1) +
+  geom_smooth(method = "lm") +
+  #scale_y_continuous(breaks=seq(250,950,by=50))   +
+  ggtitle("Trial04 Vial Oxygen (µg) Timeseries") +
+  facet_wrap(~ Treatment) + 
+  xlab("Time") +
+  ylab("Oxygen (µg)") +
+  theme_bw()
+
+
+oxyPlotµg_T4dRESPmsr90
+
+oxyPlotµg_T4dRESPmsr90 + theme(legend.position="bottom")
+# 
+oxyPlotµg_T4dRESPmsr90 + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5))
+```
+
+
+```{r}
+
+
+
+```
+
+
+
+
+
+# 8.) Analysis, Respirometry - Creating the Slope Function 
+```{r 8.) Analysis, Respirometry - Creating the Slope Function}
+#*********************************
+## 8.) Analysis, Respirometry - Creating the Slope Function  
+#*********************************  
+
+
+#krillslopes80 <- rbind(T1krillslopes80, T2krillslopes80, T3krillslopes80, T4krillslopes80)
+
+dRESPmsr90 <- rbind(T1dRESPmsr90, T2dRESPmsr90, T3dRESPmsr90, T4dRESPmsr90)
+
+
+#nmol/vial; conversion for L to ml and umol to nmol cancels
+#slope funcion of 2 vectors
+slope <- function(y,x){
+  return(lm(y~x, na.action = na.omit)$coefficients[2])
+}
+  
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# dRESPmsr90$delta_t <- as.numeric(dRESPmsr90$delta_t)
+
+cSlopes <- by(dRESPmsr90 , dRESPmsr90$KrillID, function(x){ slope(x$oxygen, x$delta_t)})
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+#creating a data frame instead of a list 
+ds <- as.data.frame(sapply(cSlopes, I))
+#having row names be a variable in a column to be able to pull it out for later merging 
+ds$TrialID<- row.names(ds)
+
+
+
+```
+
+
+
+# 9.) Merging ds and dRESPmsr (create dtotal)
+```{r 9.) Merging ds and dRESPmsr}
+#add column to dslopes that's KrillID
+#View(dref)
+ds$KrillID <- row.names(ds)
+#View(dslopes)
+dtotal <- merge(dRESPmsr90, ds, by = "KrillID")
+#View(dtotal)
+
+```
+
+
+
+# 10.) Krill ID as a factor & Grouping by Krill ID
+```{r 10.) Krill ID as a factor & Grouping by Krill ID}
+dtotal$KrillID <- factor(dtotal$KrillID)
+nlevels(dtotal$KrillID)
+
+
+```
+60 is the number of vials when Ambient Treatment is excluded
+
+
+# 11.) Analysis, Respirometry - Creating Slope Functions & Linear Models  
+```{r 11.) Analysis, Respirometry - Creating Slope Functions & Linear Models  }
+#*********************************
+## 11.1) Creating the ds dataframe
+#*********************************
+# #get slopes and r^2 values from dtotal 
+
+dSlopes <- data.frame(KrillID = levels(dtotal$KrillID))
+# dSlopes$slope <- NA
+# dSlopes$rsq <- NA
+
+for(i in 1:length(dSlopes$KrillID)){
+   m <- lm(oxygen ~ delta_t,
+                         dtotal[dtotal$KrillID == dSlopes$KrillID[i],],
+                         na.action=na.omit)
+  dSlopes$slope[i] <- m$coefficients[2]
+  dSlopes$rsq[i] <- summary(m)$r.squared
+}
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+krillslopes <- merge(dtotal, dSlopes, by="KrillID")
+
+dSlopes$SensorName <- ""
+
+dSlopes <- dSlopes %>% group_by(KrillID)
+dRESPanimal <- dRESPanimal %>% group_by(SensorName)
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+# TODO filter dRESPanimal against Ambient
+# 
+# 
+# dSlopes$KrillID <- as.character(dSlopes$KrillID)
+# dSlopes$SensorName <- dRESPanimal$SensorName
+# dSlopes$TrialID <- dRESPanimal$TrialID
+# dSlopes$MOATS <- dRESPanimal$MOATS
+# dSlopes$Treatment<- dRESPanimal$Treatment
+# dSlopes$LoadingLocation<- dRESPanimal$LoadingLocation
+# dSlopes$VialNum<- dRESPanimal$GlassVialNumber
+# dSlopes$TelsonLength<- dRESPanimal$TelsonLength..mm.
+# dSlopes$WetWeight<- dRESPanimal$Size
+
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+```
+
+
+# 12.0) Filtering krillslopes by each Trial
+```{r 12.0 Filtering dtotal by each trial}
+
+T1krillslopes <- filter(krillslopes, TrialID.x == "Trial01")
+T2krillslopes <- filter(krillslopes, TrialID.x == "Trial02")
+T3krillslopes <- filter(krillslopes, TrialID.x == "Trial03")
+T4krillslopes <- filter(krillslopes, TrialID.x == "Trial04")
+
+```
+
+
+
+# 13.) Investigating Outliers
+
+## 13.1 Investigating Outliers by Trial- cleaning up Trials Removing AMB 
+```{r 13.1 Investigating Outliers by Trial}
+
+# Filtering down krillslopes to Trial 01, 02, 03 & 04 with only included treatments
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# ''' Trial 01 ''' 
+names(T1krillslopes)
+T1krillslopes <- droplevels(filter(T1krillslopes, Treatment != "AMB"))
+levels(T1krillslopes$Treatment)
+
+
+# #|- - - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# ''' Trial 02 '''
+T2krillslopes <- droplevels(filter(T2krillslopes, Treatment != "AMB"))
+levels(T2krillslopes$Treatment)
+
+
+# #|- -  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+# ''' Trial 03 '''
+T3krillslopes <- droplevels(filter(T3krillslopes, Treatment != "AMB"))
+levels(T3krillslopes$Treatment)
+
+
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# ''' Trial 04 '''
+T4krillslopes <- droplevels(filter(T4krillslopes, Treatment != "AMB"))
+levels(T4krillslopes$Treatment)
+
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+
+
+```
+
+
+
+*Time Series Plot for the unfiltered Krill Slopes Dataframe*
+###13.1a.1 Investigating Outliers by Trial
+```{r Investigating Outliers by Trial- timeseries plots}
+
+par(mfrow = c(2,2))
+plot(T1krillslopes$delta_t, T1krillslopes$oxygen)
+plot(T2krillslopes$delta_t, T2krillslopes$oxygen)
+plot(T3krillslopes$delta_t, T3krillslopes$oxygen)
+plot(T4krillslopes$delta_t, T4krillslopes$oxygen)
+
+```
+
+
+
+### 13.e Example of loop and function writting Kate is trying to for each krill
+### 13.2e) take 1 df at a time 
+```{r 12.2a take the first dataframe}
+
+# read the 1 dataframe per trial
+# observe it learn it's secrets
+dim(T1krillslopes)
+#kable(T1krillslopes)
+```
+
+
+### 13.2f) Use the unique tool to get names for each krill
+```{r 13.2f) Use the unique tool to get names for each krill}
+
+unique(T1krillslopes$KrillID)
+qT1krillslopes <- unique(T1krillslopes$KrillID)
+#kable(qT1krillslopes)
+
+```
+
+
+
+### 13.2g) Create a linear model object for 1 krill 
+```{r 13.2g) Create a linear model object for 1 krill}
+
+df_KrillR11 <- T1krillslopes[T1krillslopes$KrillID == "Trial01_KrilLR11",]
+lm_KrillR11 <- lm(df_KrillR11$oxygen ~ df_KrillR11$delta_t)
+
+```
+
+
+
+### 13.2h) Use the fortify function to get the residuals and cook.sd for each observation
+```{r 13.2h) Use the fortify function to get the residuals and cook.sd for each observation}
+
+#lm_KrillR11 <- lm(df_KrillR11$oxygen ~ df_KrillR11$delta_t)
+#lm_KrillR11 is the referenced linear model object
+df.lm.KrillR11 <- fortify(lm_KrillR11, df_KrillR11)
+#kable(df.lm.KrillR11)
+
+```
+
+
+
+### 13.2i) Indentify which observations have a cooksd score above 4/n
+n is the whole number of observations on that krill in the vial
+```{r 13.2i) Indentify which observations have a cooksd score above 4/n}
+
+# df.lm.KrillR11sat$.cooksd <- df.lm.KrillR11[df.lm.KrillR11$.cooksd <= 4/(length(df.lm.KrillR11$KrillID)), ]
+
+```
+
+
+
+### 13.2j) Use one dataframe to sort another
+```{r 12.2f) Use one dataframe to sort another}
+
+df.lm.KrillR11$.cooksd <= 4/(length(df.lm.KrillR11$KrillID))
+
+
+```
+
+
+# 14.) Krill Sparkle Function (standard krillslopes dataframe)
+```{r 14.) Krill Sparkle Function}
+
+KRILLLmSparkle <- function(dfToFilter) {
+  # Determine the unique list of Krill IDs
+  krillIds <- unique(dfToFilter$KrillID)
+  
+  # Create an empty list to hold the filtered dataframes we'll eventually combine
+  filteredData <- list()
+  filteredDataIndex <- 1
+  
+  # Loop over each Krill ID
+  for (krillId in krillIds) {
+    #print(krillId)
+    # Split the dataframe by the Krill ID
+    filteredKrillIdData <- dfToFilter[dfToFilter$KrillID == krillId,]
+    #print(filteredKrillIdData)
+    
+    # Create the Linear Model of the resulting sub data frame
+    lm_Krill <- lm(filteredKrillIdData$oxygen ~ filteredKrillIdData$delta_t)
+    
+    # Calculate the residuals and cook stdev scores and layer them on as columns into the filtered dataframe
+    df.lm.Krill <- fortify(lm_Krill, filteredKrillIdData) 
+    #print(df.lm.Krill)
+    
+    # Filter out measurements that are outliers based on the cook stdev value
+    df.lm.Krill <- df.lm.Krill[df.lm.Krill$.cooksd <= 4/(length(df.lm.Krill$KrillID)), ]
+    #print(df.lm.Krill)
+    
+    # Merge the filtered data back into the dataframe to return
+    filteredData[[filteredDataIndex]] <- df.lm.Krill
+    filteredDataIndex <- filteredDataIndex + 1
+  }
+  
+  # Combine the list of dataframes into a single dataframe and return it
+  return(do.call(rbind, filteredData))
+}
+
+# stop here and go to next unique krill ID
+
+T1krillslopes.filtered <- KRILLLmSparkle(T1krillslopes)
+T2krillslopes.filtered <- KRILLLmSparkle(T2krillslopes)
+T3krillslopes.filtered <- KRILLLmSparkle(T3krillslopes)
+T4krillslopes.filtered <- KRILLLmSparkle(T4krillslopes)
+
+par(mfrow = c(2,2))
+plot(T1krillslopes.filtered$delta_t, T1krillslopes.filtered$oxygen)
+title("Trial 01, Outliers Excluded")
+plot(T2krillslopes.filtered$delta_t, T2krillslopes.filtered$oxygen)
+title("Trial 02, Outliers Excluded")
+plot(T3krillslopes.filtered$delta_t, T3krillslopes.filtered$oxygen)
+title("Trial 03, Outliers Excluded")
+plot(T4krillslopes.filtered$delta_t, T4krillslopes.filtered$oxygen)
+title("Trial 04, Outliers Excluded")
+
+```
+
+## 14.) Rbind back the filtered dataframes following the sparkle function
+```{r 14.) Rbind back the filtered dataframes following the sparkle function}
+
+kSlopes.filtered <- rbind(T1krillslopes.filtered, 
+                                   T2krillslopes.filtered, 
+                                   T3krillslopes.filtered, 
+                                   T4krillslopes.filtered)
+
+```
+
+
+
+
+# 17.x) Analysis, Respirometry - outliers removed (investigating krillslopes)
+```{r 17.) Analysis, Respirometry - Creating the Slope Function}
+#*********************************
+## 17.) Analysis, Respirometry - Creating the Slope Function  
+#*********************************  
+
+kSlopes.filtered
+unique(kSlopes.filtered$KrillID)
+
+# # 
+# # levels(kSlopes.filtered$Treatment)
+# # kSlopes.filtered$Treatment <- as.character(kSlopes.filtered$Treatment)
+# # unique(kSlopes.filtered$Treatment)
+# # kSlopes.filtered <- as.factor(kSlopes.filtered$Treatment)
+# 
+# kSlopes.filtered$SensoredSlope <- ""
+# kSlopes.filtered$delta_t <- as.numeric(kSlopes.filtered$delta_t)
+# 
+# 
+# #nmol/vial; conversion for L to ml and umol to nmol cancels
+# #slope funcion of 2 vectors
+# 
+# 
+# 
+# 
+# # For whole df without outliers
+# #kSlopes.filtered
+# cSlopesT1to4 <- by(kSlopes.filtered, kSlopes.filtered$KrillID, function(x){ slope(x$oxygen, x$delta_t)})
+# 
+# 
+# #|- - - - - - - - - - - - - - - - - - -  - - - - - - - - - - - - - - - - - |
+# 
+# #creating a data frame instead of a list 
+# ksT1to4 <- as.data.frame(sapply(cSlopesT1to4, I))
+# 
+# 
+# # checking for unique observations
+# 
+# 
+# #having row names be a variable in a column to be able to pull it out for later merging 
+# ksT1to4$KrillID<- row.names(ksT1to4)
+
+
+```
+
+
+
+# 18.) Merging ks... and krillslopes... 
+```{r 18.) Merging ks... and krillslopes...}
+#add column to dslopes thats KrillID
+#View(dref)
+
+# 
+# 
+# ksT1to4total <- merge(kSlopes.filtered, ksT1to4, by = "KrillID")
+
+#View(dtotal)
+
+```
+
+
+
+# 19.) Krill ID as a factor & Grouping by Krill ID - filtered DFs
+```{r 19.)  Krill ID as a factor & Grouping by Krill ID - filtered DFs}
+# dtotal$KrillID <- factor(dtotal$KrillID)
+# nlevels(dtotal$KrillID)
+
+
+```
+60 is the number of vials when Ambient Treatment is excluded
+
+
+# 20.) Analysis, Respirometry - Creating Slope Functions & Linear Models  
+```{r 20.) Analysis, Respirometry - Creating Slope Functions & Linear Models  }
+#*********************************
+## 11.1) Creating the ds dataframe
+#*********************************
+# #get slopes and r^2 values 
+#dtotal
+#ksT1to4
+#ks80
+#ks70
+#ks1hr
+
+
+# ksT1to4total 
+# ks80total 
+# ks70total 
+# ks1hrtotal 
+
+###  dSlopes (Old Example)
+# 
+# dSlopes <- data.frame(KrillID = levels(dtotal$KrillID))
+# # dSlopes$slope <- NA
+# # dSlopes$rsq <- NA
+# 
+# for(i in 1:length(dSlopes$KrillID)){
+#    m <- lm(oxygen ~ delta_t,
+#                          dtotal[dtotal$KrillID == dSlopes$KrillID[i],],
+#                          na.action=na.omit)
+#   dSlopes$slope[i] <- m$coefficients[2]
+#   dSlopes$rsq[i] <- summary(m)$r.squared
+# }
+
+
+# Using " kSlopes.filtered " to only use outlier filtered dataframe.  
+
+df_kSlopes <- data.frame(KrillID = levels(kSlopes.filtered$KrillID))
+# dSlopes$slope <- NA
+# dSlopes$rsq <- NA
+
+for(i in 1:length(df_kSlopes$KrillID)){
+   m <- lm(oxygen ~ delta_t,
+                         kSlopes.filtered[kSlopes.filtered$KrillID == df_kSlopes$KrillID[i],],
+                         na.action=na.omit)
+  df_kSlopes$slope[i] <- m$coefficients[2]
+  df_kSlopes$rsq[i] <- summary(m)$r.squared
+}
+
+
+df_kSlopes$SensorName <- ""
+
+df_kSlopes <- df_kSlopes %>% group_by(KrillID)
+dRESPanimal <- dRESPanimal %>% group_by(SensorName)
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+df_kSlopes$KrillID <- as.character(df_kSlopes$KrillID)
+df_kSlopes$SensorName <- dRESPanimal$SensorName
+df_kSlopes$TrialID <- dRESPanimal$TrialID
+df_kSlopes$MOATS <- dRESPanimal$MOATS
+df_kSlopes$Treatment<- dRESPanimal$Treatment
+df_kSlopes$LoadingLocation<- dRESPanimal$LoadingLocation
+df_kSlopes$VialNum<- dRESPanimal$GlassVialNumber
+df_kSlopes$TelsonLength<- dRESPanimal$TelsonLength..mm.
+df_kSlopes$WetWeight<- dRESPanimal$Size
+
+
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+```
+
+
+
+# 21.) Analysis, Respirometry - Correcting the Slope for Blanks
+```{r 21.) Analysis, Respirometry - Correcting the Slope for Blanks}
+
+#*********************************
+## 21.) Analysis, Respirometry - Correcting the Slope for Blanks 
+#*********************************
+
+#blank corrected slope and blank-size corrected slope
+## need to correct all slopes with the blanks' slope
+## this is the background respiration of whatever phtyos and instrument drift
+## create a mean blank slope per trial
+## merge with the master(krill slopes) and "correct" all slopes against mean value (per trial)
+# x is equal to the blank vials  
+
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+# Creating four separate means from the blank vials per trial
+x <- subset(kSlopes.filtered, MOATS == "blank")
+# x <- droplevels(filter(x, Treatment != "AMB"))
+# x <- droplevels(filter(x, Treatment != "CUR"))
+# x <- droplevels(filter(x, Treatment != "CHG"))
+
+
+xtrial1 <- subset(x, x$TrialID.x == "Trial01")
+xtrial2 <- subset(x, x$TrialID.x == "Trial02")
+xtrial3 <- subset(x, x$TrialID.x == "Trial03")
+xtrial4 <- subset(x, x$TrialID.x == "Trial04")
+
+blankmeanslope1 <- mean(xtrial1$slope)
+blankmeanslope2 <- mean(xtrial2$slope)
+blankmeanslope3 <- mean(xtrial3$slope)
+blankmeanslope4 <- mean(xtrial4$slope)
+
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+#Creating new corrected variables for slopes adjusted for blank vials and size of animal
+df_kSlopes$CorrSlope <- ""
+df_kSlopes$CorrSlope <- as.numeric(df_kSlopes$CorrSlope)
+df_kSlopes$slope <- as.numeric(df_kSlopes$slope)
+
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# Conditional Statement directing certain means to their respective trials
+# take absolute values not to add a negative nubmer
+
+df_kSlopes <- df_kSlopes %>% mutate(CorrSlope=case_when(
+    (df_kSlopes$MOATS == "blank" ~ df_kSlopes$slope),
+    (df_kSlopes$TrialID == "Trial01" ~ df_kSlopes$slope-((blankmeanslope1))),
+    (df_kSlopes$TrialID == "Trial02" ~ df_kSlopes$slope-((blankmeanslope2))),
+    (df_kSlopes$TrialID == "Trial03" ~ df_kSlopes$slope-((blankmeanslope3))),
+    (df_kSlopes$TrialID == "Trial04" ~ df_kSlopes$slope-((blankmeanslope4))),
+    TRUE ~ as.numeric(0)
+))
+
+
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# Correcting for the size of the animal 
+df_kSlopes$WetWeight <- as.numeric(df_kSlopes$WetWeight)
+df_kSlopes$CorrWeightSlope <- df_kSlopes$CorrSlope/df_kSlopes$WetWeight
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+
+#create plots and perhaps convert to larger units
+
+``` 
+
+
+
+
+# 21. Summary Statisitics on the Unfiltered Dataframe dSlopes
+```{r 21. Summary Statisitics on the Unfiltered Dataframe dSlopes}
+
+factor(df_kSlopes$TrialID)
+
+df_kSlopes <- filter(df_kSlopes, Treatment != "AMB")  
+df_kSlopes<- droplevels(filter(df_kSlopes, Treatment != "AMB"))
+df_kSlopes<- droplevels(filter(df_kSlopes, Treatment != "n/a"))
+
+df_kSlopes.summary <- df_kSlopes %>% group_by(Treatment) %>%
+  dplyr::summarize(sd = sd(CorrWeightSlope, na.rm = TRUE), 
+            mean = mean(CorrWeightSlope, na.rm = TRUE), 
+            median = median(CorrWeightSlope, na.rm = TRUE),
+            IQR = IQR(CorrWeightSlope, na.rm = TRUE),
+            n = n()) %>%
+  mutate(se = sd/sqrt(n)) %>%
+  mutate(ci = se*1.96)
+df_kSlopes.summary
+
+kable(df_kSlopes.summary, digits = 4)
+
+write.csv(df_kSlopes.summary, "2021.03.08_df_kSlopes_summary.csv")
+```
+
+
+## 21.a) Summary Statistics Graphed with Standard dSlope Values  
+```{r 21.a Summary Statistics Graphed with Standard dSlope Values, warning=FALSE}
+
+ggplot(df_kSlopes, aes(Treatment, CorrWeightSlope)) +
+            # geom_jitter(color = "grey") +
+            geom_jitter(data = df_kSlopes, aes(Treatment, CorrWeightSlope)) +
+            geom_boxplot(notch = TRUE, outlier.shape = NA, colour = "green") +
+            geom_point(data = df_kSlopes.summary, 
+                              aes(x=Treatment, y=mean), 
+                              size=5, color = "purple") + 
+            geom_errorbar(data = df_kSlopes.summary, 
+                          aes(x=Treatment, y=mean, 
+                              ymin = mean-sd, 
+                              ymax = mean+sd), 
+                              color = "blue") +
+            geom_errorbar(data = df_kSlopes.summary,
+                          aes(x=Treatment, 
+                              y=mean, 
+                              ymin = mean-ci, 
+                              ymax = mean+ci),
+                              colour = "red") +
+            # facet_wrap(~TrialID) +
+            ggtitle("Standard Krill Slope (outliers filtered & corrected for animal weight)  Values grouped by Treatment") +
+            theme_bw() 
+
+
+```
+
+
+```{r}
+kable(dSlopes.summary, digits = 4)
+
+```
+
+
+
+
+# 21.b) Analysis, Respirometry - Correcting the Slope for Blanks - 80% cutoff
+```{r 21.b) Analysis, Respirometry - Correcting the Slope for Blanks  - 80% cutoff}
+
+#*********************************
+## 21.b) Analysis, Respirometry - Correcting the Slope for Blanks  - 80% cutoff
+#*********************************
+
+#blank corrected slope and blank-size corrected slope
+## need to correct all slopes with the blanks' slope
+## this is the background respiration of whatever phtyos and instrument drift
+## create a mean blank slope per trial
+## merge with the master(krill slopes) and "correct" all slopes against mean value (per trial)
+# x is equal to the blank vials  
+
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+# Creating four separate means from the blank vials per trial
+x80 <- subset(ksSlopes80, ksSlopes80$MOATS == "blank")
+df_kSlopes<- droplevels(filter(df_kSlopes, Treatment != "AMB"))
+
+x80trial1 <- subset(x80, x80$TrialID == "Trial01")
+x80trial2 <- subset(x80, x80$TrialID == "Trial02")
+x80trial3 <- subset(x80, x80$TrialID == "Trial03")
+x80trial4 <- subset(x80, x80$TrialID == "Trial04")
+
+blank80meanslope1 <- mean(x80trial1$slope)
+blank80meanslope2 <- mean(x80trial2$slope)
+blank80meanslope3 <- mean(x80trial3$slope)
+blank80meanslope4 <- mean(x80trial4$slope)
+
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+#Creating new corrected variables for slopes adjusted for blank vials and size of animal
+ksSlopes80$CorrSlope <- ""
+ksSlopes80$CorrSlope <- as.numeric(ksSlopes80$CorrSlope)
+ksSlopes80$slope <- as.numeric(ksSlopes80$slope)
+
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# Conditional Statement directing certain means to their respective trials
+# take absolute values not to add a negative nubmer
+
+ksSlopes.80 <- ksSlopes80 %>% mutate(CorrSlope=case_when(
+    (ksSlopes80$MOATS == "blank" ~ ksSlopes80$slope),
+    (ksSlopes80$TrialID == "Trial01" ~ ksSlopes80$slope-((blank80meanslope1))),
+    (ksSlopes80$TrialID == "Trial02" ~ ksSlopes80$slope-((blank80meanslope2))),
+    (ksSlopes80$TrialID == "Trial03" ~ ksSlopes80$slope-((blank80meanslope3))),
+    (ksSlopes80$TrialID == "Trial04" ~ ksSlopes80$slope-((blank80meanslope4))),
+    TRUE ~ as.numeric(0)
+))
+
+ksSlopes80 <- ksSlopes.80
+
+
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# Correcting for the size of the animal 
+ksSlopes80$WetWeight <- as.numeric(ksSlopes80$WetWeight)
+ksSlopes80$WetWeightSlope <- ksSlopes80$CorrSlope/ksSlopes80$WetWeight
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+
+#create plots and perhaps convert to larger units
+
+``` 
+
+
+
+
+# 21.c) Summary Statisitics on the Unfiltered Dataframe dSlopes
+```{r 21.c) Summary Statisitics on the Unfiltered Dataframe dSlopes}
+
+# factor(dSlopes$TrialID)
+# 
+# dSlopes <- filter(dSlopes, Treatment != "AMB")  
+ksSlopes80<- droplevels(filter(ksSlopes80, Treatment != "n/a"))
+
+ksSlopes80.summary <- ksSlopes80 %>% group_by(Treatment) %>%
+  dplyr::summarize(sd = sd(CorrSlope, na.rm = TRUE), 
+            mean = mean(CorrSlope, na.rm = TRUE), 
+            median = median(CorrSlope, na.rm = TRUE),
+            IQR = IQR(CorrSlope, na.rm = TRUE),
+            n = n()) %>%
+  mutate(se = sd/sqrt(n)) %>%
+  mutate(ci = se*1.96)
+ksSlopes80.summary
+
+kable(ksSlopes80.summary, digits = 4)
+
+write.csv(ksSlopes80.summary, "2021.01.26_ksSlopes80_summary.csv")
+```
+
+
+# 21.d) Analysis, Respirometry - Correcting the Slope for Blanks - 70% cutoff
+```{r 21.d) Analysis, Respirometry - Correcting the Slope for Blanks  - 70% cutoff}
+
+#*********************************
+## 21.d) Analysis, Respirometry - Correcting the Slope for Blanks  - 80% cutoff
+#*********************************
+
+#blank corrected slope and blank-size corrected slope
+## need to correct all slopes with the blanks' slope
+## this is the background respiration of whatever phtyos and instrument drift
+## create a mean blank slope per trial
+## merge with the master(krill slopes) and "correct" all slopes against mean value (per trial)
+# x is equal to the blank vials  
+
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+# Creating four separate means from the blank vials per trial
+x70 <- subset(ksSlopes70, ksSlopes70$MOATS == "blank")
+
+x70trial1 <- subset(x70, x70$TrialID == "Trial01")
+x70trial2 <- subset(x70, x70$TrialID == "Trial02")
+x70trial3 <- subset(x70, x70$TrialID == "Trial03")
+x70trial4 <- subset(x70, x70$TrialID == "Trial04")
+
+blank70meanslope1 <- mean(x70trial1$slope)
+blank70meanslope2 <- mean(x70trial2$slope)
+blank70meanslope3 <- mean(x70trial3$slope)
+blank70meanslope4 <- mean(x70trial4$slope)
+
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+#Creating new corrected variables for slopes adjusted for blank vials and size of animal
+ksSlopes70$CorrSlope <- ""
+ksSlopes70$CorrSlope <- as.numeric(ksSlopes70$CorrSlope)
+ksSlopes70$slope <- as.numeric(ksSlopes70$slope)
+
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# Conditional Statement directing certain means to their respective trials
+# take absolute values not to add a negative nubmer
+
+ksSlopes.70 <- ksSlopes70 %>% mutate(CorrSlope=case_when(
+    (ksSlopes70$MOATS == "blank" ~ ksSlopes70$slope),
+    (ksSlopes70$TrialID == "Trial01" ~ ksSlopes70$slope-((blank70meanslope1))),
+    (ksSlopes70$TrialID == "Trial02" ~ ksSlopes70$slope-((blank70meanslope2))),
+    (ksSlopes70$TrialID == "Trial03" ~ ksSlopes70$slope-((blank70meanslope3))),
+    (ksSlopes70$TrialID == "Trial04" ~ ksSlopes70$slope-((blank70meanslope4))),
+    TRUE ~ as.numeric(0)
+))
+
+
+ksSlopes70 <- ksSlopes.70
+
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# Correcting for the size of the animal 
+ksSlopes70$WetWeight <- as.numeric(ksSlopes70$WetWeight)
+ksSlopes70$WetWeightSlope <- ksSlopes70$CorrSlope/ksSlopes70$WetWeight
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+
+#create plots and perhaps convert to larger units
+
+``` 
+
+
+
+
+# 21.e Summary Statisitics on the Unfiltered Dataframe dSlopes
+```{r 21.e Summary Statisitics on the Unfiltered Dataframe dSlopes}
+
+# factor(dSlopes$TrialID)
+# 
+# dSlopes <- filter(dSlopes, Treatment != "AMB")  
+# dSlopes<- droplevels(filter(dSlopes, Treatment != "AMB"))
+
+ksSlopes70<- droplevels(filter(ksSlopes70, Treatment != "n/a"))
+
+ksSlopes70.summary <- ksSlopes70 %>% group_by(Treatment) %>%
+  dplyr::summarize(sd = sd(CorrSlope, na.rm = TRUE), 
+            mean = mean(CorrSlope, na.rm = TRUE), 
+            median = median(CorrSlope, na.rm = TRUE),
+            IQR = IQR(CorrSlope, na.rm = TRUE),
+            n = n()) %>%
+  mutate(se = sd/sqrt(n)) %>%
+  mutate(ci = se*1.96)
+ksSlopes70.summary
+
+kable(ksSlopes70.summary, digits = 4)
+
+write.csv(ksSlopes70.summary, "2021.01.26_ksSlopes70_summary.csv")
+```
+
+
+
+
+# 21.f) Analysis, Respirometry - Correcting the Slope for Blanks - 1hr cutoff
+```{r 21.f) Analysis, Respirometry - Correcting the Slope for Blanks  - 1hr cutoff}
+
+#*********************************
+## 21.f) Analysis, Respirometry - Correcting the Slope for Blanks  - 1hr cutoff
+#*********************************
+
+#blank corrected slope and blank-size corrected slope
+## need to correct all slopes with the blanks' slope
+## this is the background respiration of whatever phtyos and instrument drift
+## create a mean blank slope per trial
+## merge with the master(krill slopes) and "correct" all slopes against mean value (per trial)
+# x is equal to the blank vials  
+
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+# Creating four separate means from the blank vials per trial
+x1hr <- subset(ksSlopes1hr, ksSlopes1hr$MOATS == "blank")
+
+x1hrtrial1 <- subset(x1hr, x1hr$TrialID == "Trial01")
+x1hrtrial2 <- subset(x1hr, x1hr$TrialID == "Trial02")
+x1hrtrial3 <- subset(x1hr, x1hr$TrialID == "Trial03")
+x1hrtrial4 <- subset(x1hr, x1hr$TrialID == "Trial04")
+
+blank1hrmeanslope1 <- mean(x1hrtrial1$slope)
+blank1hrmeanslope2 <- mean(x1hrtrial2$slope)
+blank1hrmeanslope3 <- mean(x1hrtrial3$slope)
+blank1hrmeanslope4 <- mean(x1hrtrial4$slope)
+
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+#Creating new corrected variables for slopes adjusted for blank vials and size of animal
+ksSlopes1hr$CorrSlope <- ""
+ksSlopes1hr$CorrSlope <- as.numeric(ksSlopes1hr$CorrSlope)
+ksSlopes1hr$slope <- as.numeric(ksSlopes1hr$slope)
+
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# Conditional Statement directing certain means to their respective trials
+# take absolute values not to add a negative nubmer
+
+ksSlopes.1hr <- ksSlopes1hr %>% mutate(CorrSlope=case_when(
+    (ksSlopes1hr$MOATS == "blank" ~ ksSlopes1hr$slope),
+    (ksSlopes1hr$TrialID == "Trial01" ~ ksSlopes1hr$slope-((blank1hrmeanslope1))),
+    (ksSlopes1hr$TrialID == "Trial02" ~ ksSlopes1hr$slope-((blank1hrmeanslope2))),
+    (ksSlopes1hr$TrialID == "Trial03" ~ ksSlopes1hr$slope-((blank1hrmeanslope3))),
+    (ksSlopes1hr$TrialID == "Trial04" ~ ksSlopes1hr$slope-((blank1hrmeanslope4))),
+    TRUE ~ as.numeric(0)
+))
+
+
+ksSlopes1hr <- ksSlopes.1hr
+
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# Correcting for the size of the animal 
+ksSlopes1hr$WetWeight <- as.numeric(ksSlopes1hr$WetWeight)
+ksSlopes1hr$WetWeightSlope <- ksSlopes1hr$CorrSlope/ksSlopes1hr$WetWeight
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+
+#create plots and perhaps convert to larger units
+
+``` 
+
+
+# Executive Summary
+
+
+# 21.g Summary Statisitics on the Unfiltered Dataframe dSlopes
+```{r 21.g Summary Statisitics on the Unfiltered Dataframe dSlopes}
+
+# factor(dSlopes$TrialID)
+# 
+# dSlopes <- filter(dSlopes, Treatment != "AMB")  
+# dSlopes<- droplevels(filter(dSlopes, Treatment != "AMB"))
+ksSlopes1hr<- droplevels(filter(ksSlopes1hr, Treatment != "n/a"))
+
+ksSlopes1hr.summary <- ksSlopes1hr %>% group_by(Treatment) %>%
+  dplyr::summarize(sd = sd(CorrSlope, na.rm = TRUE), 
+            mean = mean(CorrSlope, na.rm = TRUE), 
+            median = median(CorrSlope, na.rm = TRUE),
+            IQR = IQR(CorrSlope, na.rm = TRUE),
+            n = n()) %>%
+  mutate(se = sd/sqrt(n)) %>%
+  mutate(ci = se*1.96)
+ksSlopes1hr.summary
+
+kable(ksSlopes1hr.summary, digits = 4)
+
+write.csv(ksSlopes1hr.summary, "2026.01.26_ksSlopes1hr_summary.csv")
+```
+
+
+# 22.) 80% Slope for Corrected Slopes
+```{r}
+plot80 <- ggplot(ksSlopes80, aes(Treatment, CorrSlope)) +
+            geom_jitter(color = "grey") +
+            geom_jitter(data = ksSlopes80, aes(Treatment, CorrSlope)) +
+            # geom_jitter(data = krillslopes80.filtered, aes(Treatment, slope)) +
+            # geom_jitter(data = krillslopes70.filtered, aes(Treatment, slope)) +
+            # geom_jitter(data = kSlopes.filtered, aes(Treatment, slope)) +
+            # geom_jitter(aes(colour = Treatment)) +
+            geom_boxplot(notch = TRUE, outlier.shape = NA, colour = "green") +
+            geom_point(data = ksSlopes80.summary, aes(x=Treatment, y=mean), size=5, color = "purple") + 
+            geom_errorbar(data = ksSlopes80.summary, 
+                          aes(x=Treatment, y=mean, ymin = mean-sd, ymax = mean+sd), 
+                          color = "blue") +
+            geom_errorbar(data = ksSlopes80.summary,
+                          aes(x=Treatment, y=mean, ymin = mean-ci, ymax = mean+ci),
+                          colour = "red") +
+            # facet_wrap(~TrialID) +
+            ggtitle("ksSlopes80, (80% oxygen) Corrected Slope") +
+            theme_bw() 
+
+
+plot80
+```
+
+The purple dots represent the mean- all trials included
+Confidence Intervals set to 95
+Green boxplots show from the 25th percentil to the 75th percentile
+error bars +/- SD shown in blue
+error bars(CI) +/- our confidence intervals- shown in red
+
+
+
+
+# 23.) 70% Slope for Corrected Slopes
+```{r}
+plot70 <- ggplot(ksSlopes70, aes(Treatment, CorrSlope)) +
+            geom_jitter(color = "grey") +
+            geom_jitter(data = ksSlopes70, aes(Treatment, CorrSlope)) +
+            # geom_jitter(data = krillslopes80.filtered, aes(Treatment, slope)) +
+            # geom_jitter(data = krillslopes70.filtered, aes(Treatment, slope)) +
+            # geom_jitter(data = kSlopes.filtered, aes(Treatment, slope)) +
+            # geom_jitter(aes(colour = Treatment)) +
+            geom_boxplot(notch = TRUE, outlier.shape = NA, colour = "green") +
+            geom_point(data = ksSlopes70.summary, aes(x=Treatment, y=mean), size=5, color = "purple") + 
+            geom_errorbar(data = ksSlopes70.summary, 
+                          aes(x=Treatment, y=mean, ymin = mean-sd, ymax = mean+sd), 
+                          color = "blue") +
+            geom_errorbar(data = ksSlopes70.summary,
+                          aes(x=Treatment, y=mean, ymin = mean-ci, ymax = mean+ci),
+                          colour = "red") +
+            # facet_wrap(~TrialID) +
+            ggtitle("ksSlopes70, (70% oxygen) Corrected Slope") +
+            theme_bw() 
+
+plot70
+
+```
+
+The purple dots represent the mean- all trials included
+Confidence Intervals set to 95
+Green boxplots show from the 25th percentil to the 75th percentile
+error bars +/- SD shown in blue
+error bars(CI) +/- our confidence intervals- shown in red
+
+
+
+
+# 24.) 1hr cutoff Slope for Corrected Slopes
+```{r}
+
+Onehrplot <- ggplot(ksSlopes1hr, aes(Treatment, CorrSlope)) +
+            geom_jitter(color = "grey") +
+            geom_jitter(data = ksSlopes1hr, aes(Treatment, CorrSlope)) +
+            # geom_jitter(data = krillslopes80.filtered, aes(Treatment, slope)) +
+            # geom_jitter(data = krillslopes70.filtered, aes(Treatment, slope)) +
+            # geom_jitter(data = kSlopes.filtered, aes(Treatment, slope)) +
+            # geom_jitter(aes(colour = Treatment)) +
+            geom_boxplot(notch = TRUE, outlier.shape = NA, colour = "green") +
+            geom_point(data = ksSlopes1hr.summary, aes(x=Treatment, y=mean), size=5, color = "purple") + 
+            geom_errorbar(data = ksSlopes1hr.summary, 
+                          aes(x=Treatment, y=mean, ymin = mean-sd, ymax = mean+sd), 
+                          color = "blue") +
+            geom_errorbar(data = ksSlopes1hr.summary,
+                          aes(x=Treatment, y=mean, ymin = mean-ci, ymax = mean+ci),
+                          colour = "red") +
+            # facet_wrap(~TrialID) +
+            ggtitle("ksSlopes1hr, (1hr cutoff) Corrected Slope") +
+            theme_bw() 
+
+Onehrplot 
+
+```
+
+The purple dots represent the mean- all trials included
+Confidence Intervals set to 95
+Green boxplots show from the 25th percentil to the 75th percentile
+error bars +/- SD shown in blue
+error bars(CI) +/- our confidence intervals- shown in red
+
+
+
+# 25.) Descriptive Statisitics 
+```{r 25.) Descriptive Statisitics}
+library(tidyr)
+#Remove NAs
+#krill <- na.omit(krill)
+#Calculate mean and standard deviation for each treatment per each dataset
+# blanks are to be removed from treatments
+
+dSlopes<- droplevels(filter(dSlopes, Treatment != "n/a"))
+ksSlopes80<- droplevels(filter(ksSlopes80, Treatment != "n/a"))
+ksSlopes70<- droplevels(filter(ksSlopes70, Treatment != "n/a"))
+ksSlopes1hr<- droplevels(filter(ksSlopes1hr, Treatment != "n/a"))
+
+
+dSlopes_Avg <- tapply(dSlopes$CorrSlope, (dSlopes$Treatment), mean)
+dSlopes_Med <- tapply(dSlopes$CorrSlope, (dSlopes$Treatment), median)
+dSlopes_Std <- tapply(dSlopes$CorrSlope, (dSlopes$Treatment), sd)
+
+ksSlopes80_Avg <- tapply(ksSlopes80$CorrSlope, (ksSlopes80$Treatment), mean)
+ksSlopes80_Med <- tapply(ksSlopes80$CorrSlope, (ksSlopes80$Treatment), median)
+ksSlopes80_Std <- tapply(ksSlopes80$CorrSlope, (ksSlopes80$Treatment), sd)
+
+ksSlopes70_Avg <- tapply(ksSlopes70$CorrSlope, (ksSlopes70$Treatment), mean)
+ksSlopes70_Med <- tapply(ksSlopes70$CorrSlope, (ksSlopes70$Treatment), median)
+ksSlopes70_Std <- tapply(ksSlopes70$CorrSlope, (ksSlopes70$Treatment), sd)
+
+ksSlopes1hr_Avg <- tapply(ksSlopes1hr$CorrSlope, (ksSlopes1hr$Treatment), mean)
+ksSlopes1hr_Med <- tapply(ksSlopes1hr$CorrSlope, (ksSlopes1hr$Treatment), median)
+ksSlopes1hr_Std <- tapply(ksSlopes1hr$CorrSlope, (ksSlopes1hr$Treatment), sd)
+
+
+#Put it all together
+Slope_Stats <- cbind(dSlopes_Avg, dSlopes_Med, dSlopes_Std,
+                     ksSlopes80_Avg, ksSlopes80_Med, ksSlopes80_Std,
+                     ksSlopes70_Avg, ksSlopes70_Med, ksSlopes70_Std,
+                     ksSlopes1hr_Avg, ksSlopes1hr_Med, ksSlopes1hr_Std)
+
+colnames(Slope_Stats) [1:12] <-c("Avg All Points Corrected Slopes", "Med All Points Corrected Slopes", "All Points Corrected Slopes SD", "Avg 80% DO Corrected Slopes", "Med 80% DO Corrected Slopes", "80% DO Corrected Slopes SD", "Avg 70% DO Corrected Slopes", "Med 70% DO Corrected Slopes", "70% DO Corrected Slopes SD", "Avg 1hr Corrected Slopes", "Med 1hr Corrected Slopes", "1hr Corrected Slopes SD")
+
+
+write.csv(Slope_Stats, "2020.01.26_Slope_Stats.csv")
+
+kable(Slope_Stats)
+
+```
+
+
+
+
+# 26.) Fitting my Linear Mixed-Effects Models to my Dataframes 
+```{r Repeated measures analysis}
+#Using a mixed model to find significant differences bertween MOATs
+#library(nlme)
+library(lme4)
+library(lmerTest)
+
+# Corrected Slopes , Treatment taking into account MOATS
+
+
+ksSlopes.80<- droplevels(filter(ksSlopes.80, Treatment != "n/a"))
+ksSlopes.70<- droplevels(filter(ksSlopes.70, Treatment != "n/a"))
+ksSlopes.1hr<- droplevels(filter(ksSlopes.1hr, Treatment != "n/a"))
+dSlopes<- droplevels(filter(dSlopes, Treatment != "n/a"))
+
+
+ksSlopes.1hr_howmanyanimalsin_CHG <- subset(ksSlopes.1hr, Treatment == "CHG")
+ks1hrCHGno <- unique(ksSlopes.1hr_howmanyanimalsin_CHG$KrillID)
+# 16 animals in All Change across 4 trials
+
+ksSlopes.1hr_howmanyanimalsin_CUR <- subset(ksSlopes.1hr, Treatment == "CUR")
+ks1hrCURno <- unique(ksSlopes.1hr_howmanyanimalsin_CUR$KrillID)
+# 19 animals from Current Treatment across 4 trials
+
+ksSlopes.1hr_howmanyanimalsin_TMP <- subset(ksSlopes.1hr, Treatment == "TMP")
+ks1hrTMPno <- unique(ksSlopes.1hr_howmanyanimalsin_TMP$KrillID)
+# 16 animals in high Temperature Treatment across 4 trials
+
+
+16+19+16
+# [1] 51
+
+```
+
+
+# 26.a) 1hr Dataframe - LMER
+```{r, 26.a) 1hr Dataframe - LMER}
+lmer.ksSlopes.1hr <- lmer(CorrSlope ~ Treatment + (1|MOATS), data = ksSlopes.1hr)
+summary(lmer.ksSlopes.1hr)
+# All Change Against Current 
+# All Change Against High Temperature
+```
+
+"1hr Dataset" - No Treatment Effect Found
+
+Random Effects Model variance accounting for a possible MOATs effect remains significantly small.
+No treatment effect observed. 
+Neither correlation or T values between "All Change(CHG)" to "Current(CUR)" and "High Temperature(TMP)" 
+This model doesn't consider High Temperature directly against Current
+Model re-ogranized/re-leveled below
+
+
+#### 26.b) 1hr Dataframe - LMER releved Current 1st
+```{r 26.b) 1hr Dataframe - LMER}
+
+levels(ksSlopes.1hr$Treatment)
+# lmer.ksSlopes.1hr 
+ksSlopes.1hr$Treatment <- fct_relevel(ksSlopes.1hr$Treatment, "CUR")
+lmer.ksSlopes.1hr <- lmer(CorrSlope ~ Treatment + (1|MOATS), data = ksSlopes.1hr)
+summary(lmer.ksSlopes.1hr)
+
+```
+
+The Current Conditions to Hight Temperature comparison did not display a treatment effect. 
+
+Possible reasons for such small amount of variance include only 51 animals in trial.
+16 animals from the "All Change" treatment were in included across four trials.
+19 animals from the "Current" treatment were in included across four trials.
+16 animals from the "High Temperarure" treatment were in included across four trials.
+(totals 51 animals)
+
+so signal over the noise- why?
+
+1hr may not have allowed enough observations to show a disernable difference across treatments.
+However, Krill could just be proving to be a robust organism, able to withstand a cross stress environment. 
+It's more likely that sample size was small.
+
+
+
+# 26.c) 80% Threshold Dataframe - LMER
+```{r, 26.c) 1hr Dataframe - LMER}
+lmer.ksSlopes.80 <- lmer(CorrSlope ~ Treatment + (1|MOATS), data = ksSlopes.80)
+summary(lmer.ksSlopes.80)
+# All Change Against Current 
+# All Change Against High Temperature
+```
+
+The 80% (DO) Threshold t values are slightly smaller. 
+The variance around a MOATs effect remains significantly small.
+No treatment effect observed.
+Model re-organized/re-leveled below to compare "Current" against "High Temperature" directly
+
+
+
+#### 26.d) 80% Threshold - LMER releved Current 1st
+```{r 26.d) 80% Dataframe - LMER}
+
+levels(ksSlopes.80$Treatment)
+# lmer.ksSlopes.1hr 
+ksSlopes.80$Treatment <- fct_relevel(ksSlopes.80$Treatment, "CUR")
+lmer.ksSlopes.80 <- lmer(CorrSlope ~ Treatment + (1|MOATS), data = ksSlopes.80)
+summary(lmer.ksSlopes.80)
+
+```
+When comparing Current against "High Temperature" and "All Change" the T values remain small but the TMP to CUR is somewhat larger. 
+
+Still, no discernible treatment effect, no discernible MOATS effect. 
+
+
+
+# 26.e) 70% Threshold Dataframe - LMER
+```{r, 26.e) 70% Dataframe - LMER}
+lmer.ksSlopes.70 <- lmer(CorrSlope ~ Treatment + (1|MOATS), data = ksSlopes.70)
+summary(lmer.ksSlopes.70)
+# All Change Against Current 
+# All Change Against High Temperature
+```
+
+
+The variance around a MOATs effect remains significantly small in this 70% Threshold dataset.
+No treatment effect observed.
+Model re-organized/re-leveled below to compare "Current" against "High Temperature" directly
+
+
+#### 26.f) 70% Threshold - LMER releved Current 1st
+```{r 26.f) 70% Dataframe - LMER}
+
+levels(ksSlopes.70$Treatment)
+# lmer.ksSlopes.1hr 
+ksSlopes.70$Treatment <- fct_relevel(ksSlopes.70$Treatment, "CUR")
+lmer.ksSlopes.70 <- lmer(CorrSlope ~ Treatment + (1|MOATS), data = ksSlopes.70)
+summary(lmer.ksSlopes.70)
+
+```
+
+No discernible treatment effect, no discernible MOATS effect. 
+None of the "threshold confined" datasets displayed a MOATs or Treatment Effect.
+
+
+Below shows the comparison is slopes values when all data points were considered. 
+
+
+# 26.g) All Points "dSlopes" Dataframe - LMER
+```{r, 26.g) All Points Dataframe - LMER}
+lmer.dSlopes<- lmer(CorrSlope ~ Treatment + (1|MOATS), data = dSlopes)
+summary(lmer.dSlopes)
+# All Change Against Current 
+# All Change Against High Temperature
+```
+
+
+The variance around a MOATs effect remains so significantly small.
+No MOATs effect
+No treatment effect observed.
+Model re-organized/re-leveled below to compare "Current" against "High Temperature" directly
+
+
+#### 26.f) All Points - LMER releved Current 1st
+```{r 26.f) All Points - LMER}
+
+levels(dSlopes$Treatment)
+
+dSlopes$Treatment <- fct_relevel(dSlopes$Treatment, "CUR")
+lmer.dSlopes <- lmer(CorrSlope ~ Treatment + (1|MOATS), data = dSlopes)
+summary(lmer.dSlopes)
+
+```
+
+
+
+```{r Models Commented Out & next step thoughts}
+# 
+# # Just a chunk of the models held back case I need them.  
+# 
+# lmer.ksSlopes.80 <- lmer(CorrSlope ~ Treatment + (1|MOATS), data = ksSlopes.80)
+# summary(lmer.ksSlopes.80)
+# 
+# lmer.ksSlopes.70 <- lmer(CorrSlope ~ Treatment + (1|MOATS), data = ksSlopes.70)
+# summary(lmer.ksSlopes.70)
+# 
+# lmer.dSlopes <- lmer(CorrSlope ~ Treatment + (1|MOATS), data = dSlopes)
+# summary(lmer.dSlopes)
+# 
+# 
+# 
+# # what about different rounds on different days?
+```
+
+
+
+
+```{r}
+
+Onehrplot
+```
+
+
+```{r}
+plot70
+```
+
+
+
+```{r}
+plot80
+```
+
+
+```{r}
+dSlopesplot
+```
+
+
+
+
+*Slope Statistics*
+```{r}
+kable(Slope_Stats)
+```
+
+
+*Krill Slopes 1hr Summary Table*
+```{r}
+kable(ksSlopes1hr.summary, digits = 4)
+```
+
+
+*Krill Slopes (70min cutoff) Summary Table*
+```{r}
+kable(ksSlopes70.summary, digits = 8)
+```
+
+
+*Krill Slopes (80min cutoff) Summary Table*
+```{r}
+kable(ksSlopes80.summary, digits = 8)
+```
+
+
+*Krill Slopes (all points) Summary Table*
+```{r}
+kable(dSlopes.summary, digits = 8)
+```
+
+
+*Krill Slopes (1hr cutoff) Mixed Effects Model*
+```{r}
+summary(lmer.ksSlopes.1hr)
+```
+
+
+*Krill Slopes (80min cutoff) Mixed Effects Model*
+```{r}
+summary(lmer.ksSlopes.80)
+```
+
+
+*Krill Slopes (70min cutoff) Mixed Effects Model*
+```{r}
+summary(lmer.ksSlopes.70)
+```
+
+
+*Krill Slopes (all points) Mixed Effects Model*
+```{r}
+summary(lmer.dSlopes)
+```
+
+
+# 27.) Writing CSVs for follow on work
+```{r}
+
+```
+
+
+
+# 28.) Linear Models
+``` {r }
+> fit.1hr <- lm(CorrSlope ~ Treatment, data=ksSlopes.1hr)
+> summary(fit)
+```
+
+
+# 29. Writing Documents 
+```{r 29.a All Points}
+write.csv(dSlopes, file = "2021.02.09_Slopes_allpts.csv", row.names = FALSE)
+```
+
+
+
+# 29.b Writing Documents 
+```{r 29.b  80% threshold Points}
+write.csv(ksSlopes.80, file = "2021.02.09_ksSlopes.80.csv", row.names = FALSE)
+```
+
+
+
+
+# 29.c Writing Documents 
+```{r 29.c  70% threshold Points}
+write.csv(ksSlopes.70, file = "2021.02.09_ksSlopes.70.csv", row.names = FALSE)
+```
+
+
+
+# 29.d Writing Documents 
+```{r 29.d  1hr threshold Points}
+write.csv(ksSlopes.1hr, file = "2021.02.09_ksSlopes.1hr.csv", row.names = FALSE)
+```
+
+
+
+
+
+
+```{r}
+#**************E*N*D*************# 
+#*********************************
+## END OF SCRIPT | END OF DOCUMENT 
+#*********************************
+```
+
+
+## END OF SCRIPT | END OF DOCUMENT
+
