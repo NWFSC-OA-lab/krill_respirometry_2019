@@ -12,7 +12,7 @@ output:
     highlight: haddock
     smart: false
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 
 
@@ -84,7 +84,7 @@ library(metacsv)
 #*********************************
 
 #set working directory to the correct folder
-setwd("/Users/katherinerovinski/GIT/NWFSC.MUK_KRL2019respirometrySLOPES")
+setwd("/Users/paul.mcelhany/Downloads")
 ```
 
 
@@ -696,7 +696,11 @@ T4dRESPmsr90 <- filter(T4dRESPmsr90,
 
 #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
 
-
+burnIn <- 0
+trial_duration <- 1.5
+dRESPmsr_90 <- dRESPmsr %>%
+  group_by(TrialID) %>%
+  filter(delta_t > burnIn & delta_t < trial_duration)
 
 
 ```
@@ -906,6 +910,14 @@ write.csv(trial4Table, "2021.03.05_RespirometryTrial04Table.csv")
 
 ### 7.1a) PLotting Percent DO filtering Trial 1
 ```{r 7.1a) PLotting Percent DO filtering Trial 1, warning=FALSE}
+
+dRESPmsr_90 %>%
+  ggplot(aes(delta_t, oxygen)) +
+ # ggplot(aes(delta_t, actualDOmg)) +
+  geom_point(aes(colour = TrialID)) +
+  geom_smooth(aes(colour = TrialID),method = "lm") +
+  facet_wrap(vars(Treatment))
+  
 
 
 T1dRESPmsr90_DOplot <- ggplot(T1dRESPmsr90, 
@@ -1190,6 +1202,7 @@ slope <- function(y,x){
 # dRESPmsr90$delta_t <- as.numeric(dRESPmsr90$delta_t)
 
 cSlopes <- by(dRESPmsr90 , dRESPmsr90$KrillID, function(x){ slope(x$oxygen, x$delta_t)})
+
 
 #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
 
