@@ -12,7 +12,7 @@ output:
     highlight: haddock
     smart: false
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 
 
@@ -117,7 +117,6 @@ names(dRESPanimal)
 dRESPanimal <- droplevels(filter(dRESPanimal, Treatment != "AMB"))
 
 
-library(metacsv)
 # a <- read_meta("RespirometryTrials_all.Animal.Info.csv")
 # get_a <- get_attributes(a)
 
@@ -209,7 +208,7 @@ dRESPmsr <- subset(dRESPmsr, Value != "---")
 # 76, 4x19 propoer number of animals under observation 
 unique(dRESPmsr$SensorName)
 UniqueSensorNames <- levels(dRESPmsr$SensorName)
-write.table(UniqueSensorNames, file = "2020.03.01_DRESPmsr_UniqueSensorNames.csv")
+write.table(UniqueSensorNames, file = "2020.03.15_DRESPmsr_UniqueSensorNames.csv")
 #kable(UniqueSensorNames)
 
 ```
@@ -761,6 +760,11 @@ Trial1_TMP <- 8
 
 #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
 
+
+T1dRESPmsr90_treatmentquery_blank <- filter(T1dRESPmsr90, Treatment == "blank")
+unique(T1dRESPmsr90_treatmentquery_blank$KrillID)
+# [1] "Trial01_KrilLR12" 
+# [2] "Trial01_KrilLR19"
 Trial1_Blanks <- 2
 
 #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
@@ -803,6 +807,11 @@ unique(T2dRESPmsr90_treatmentquery_TMP$KrillID)
 # character(0)
 Trial2_TMP <- 0
 #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+T2dRESPmsr90_treatmentquery_blank <- filter(T2dRESPmsr90, Treatment == "blank")
+unique(T2dRESPmsr90_treatmentquery_blank$KrillID)
+# [1] "Trial02_KriLR224" 
+# [2] "Trial02_KriLR230"
 
 Trial2_Blanks <- 2
 trial2Table <- data.frame(Trial2Animals, Trial2_CHG, Trial2_CUR, Trial2_TMP, Trial2_Blanks)
@@ -854,6 +863,11 @@ unique(T3dRESPmsr90_treatmentquery_TMP$KrillID)
 Trial3_TMP <- 8
 #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
 
+T3dRESPmsr90_treatmentquery_blank <- filter(T3dRESPmsr90, Treatment == "blank")
+unique(T3dRESPmsr90_treatmentquery_blank$KrillID)
+# [1] "Trial03_KRLr3_43" 
+# [2] "Trial03_KRLr3_52"
+
 Trial3_Blanks <- 2
 trial3Table <- data.frame(Trial3Animals, Trial3_CHG, Trial3_CUR, Trial3_TMP, Trial3_Blanks)
 write.csv(trial3Table, "2021.03.05_RespirometryTrial03Table.csv")
@@ -889,6 +903,11 @@ T4dRESPmsr90_treatmentquery_TMP <- filter(T4dRESPmsr90, Treatment == "TMP")
 unique(T4dRESPmsr90_treatmentquery_TMP$KrillID)
 Trial4_TMP <- 0
 
+T4dRESPmsr90_treatmentquery_blank <- filter(T4dRESPmsr90, Treatment == "blank")
+unique(T4dRESPmsr90_treatmentquery_blank$KrillID)
+# [1] "Trial04_KRLr4_59" 
+# [2] "Trial04_KRLr4_68" 
+# [3] "Trial04_KRLr4_69"
 
 Trial4_Blanks <- 2
 trial4Table <- data.frame(Trial4Animals, Trial4_CHG, Trial4_CUR, Trial4_TMP, Trial4_Blanks)
