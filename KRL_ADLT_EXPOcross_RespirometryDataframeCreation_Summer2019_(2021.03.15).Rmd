@@ -1,0 +1,954 @@
+
+---
+title: "Respirometry Trials for Summer Krill 2019"
+output:
+ html_document:
+    df_print: paged
+    code_folding: hide
+    toc: TRUE
+    toc_depth: 4
+    toc_float: true
+    theme: cerulean
+    highlight: haddock
+    smart: false
+editor_options: 
+  chunk_output_type: console
+---
+
+
+Hello World
+
+Author: OA Lab, NWFSC
+Title: Respirometry Trials for Summer Krill 2019
+KRL_ADLT_EXPOcross_RESPRsmr2019(2021.03.15)
+Krill, Adult, Exposure Cross Respirometry Summer 2019 (date modified)
+Date: December 2020 - March 2021
+
+
+# Version Check
+```{r 0.1 Version Check , echo=FALSE, results=FALSE, message=FALSE, warning=FALSE}
+#*********************************
+## Version Check
+#********************************* 
+R.version
+
+```
+
+
+
+# Libraries
+```{r 0.0 Libraries , echo=FALSE, results=FALSE, message=FALSE, warning=FALSE}
+#*********************************
+##Libraries
+#********************************* 
+library(stringr)
+library(tidyverse)
+library(plyr)
+library(nlme)
+library(tidyr)
+library(dbplyr)
+library(dplyr)
+library(purrr)
+library(wql)
+library(lubridate)
+library(tibbletime)
+library(arsenal)
+library(compareDF)
+library(todor)
+#for graphing
+library(ggplot2)
+library(ggfortify)
+library(stringr)
+library(nlme)
+library(RColorBrewer)
+library(patchwork)
+#statistical analysis
+library(gdata)
+library(rsq)
+library(doBy)
+library(lme4)
+library(lmerTest)
+#Rnotebooks 
+library(gridExtra)
+library(kableExtra)
+library(todor)
+#metadata
+library(metacsv)
+
+```
+
+
+ 
+ # 1.) Setting Working Directory
+```{r 1.) Setting Working Directory }
+#*********************************
+## 1.) Setting Working Directory
+#*********************************
+
+#set working directory to the correct folder
+# just kidding let's us the here package
+
+# setwd("/Users/paul.mcelhany/Downloads")
+setwd("/Users/katherinerovinski/GIT/NWFSC.MUK_KRL2019respirometry90min")
+
+
+```
+
+
+
+# 2.) DF Creation
+```{r 2.) Creating the Dataframe }
+
+#*********************************
+## 2.) Creating the initial Dataframe, dRESP
+#*********************************
+
+## Method 1 - 1 file for the four trials
+#get all the files in the defined working directory that are in csv format  
+dRESP <- read.csv(file = "KRILL_Resp_alltrials.csv", stringsAsFactors = FALSE)
+dim(dRESP)
+# dRESP <- read_csv(here("01_rawData","KRILL_Resp_alltrials.csv"))
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+
+# dRESPanimal represents just the animal, vial, MOATs, etc.  
+dRESPanimal <-                                                                              read.csv(file = "RespirometryTrials_all.Animal.Info.csv", 
+                        stringsAsFactors = FALSE) 
+# dRESPanimal <- read_csv(here("RespirometryTrials_all.Animal.Info.csv"))
+
+dim(dRESPanimal)
+names(dRESPanimal)
+dRESPanimal <- droplevels(filter(dRESPanimal, Treatment != "AMB"))
+
+
+# a <- read_meta("RespirometryTrials_all.Animal.Info.csv")
+# get_a <- get_attributes(a)
+
+# a <- get_attributes()
+# write.csv(a$gen_attributes, file = "2021.03.03_attributes.csv")
+# write.csv(a$var_attributes, file = "2021.03.03_var_attributes.csv")
+# write.csv(dRESPanimal, file = "2021.03.01_krillanimaldata.csv", row.names = FALSE)
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+
+#dRESPmsr represents the measurements made by the presense optical device for Dissolved Oxygen 
+
+dRESPmsr <- merge(dRESP, 
+                  dRESPanimal, 
+                  by="SensorName")
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+
+dRESPmsr <- dRESPmsr %>% filter(!MOATS %in% c("3", "4", "5", "11")) %>%
+  filter(Treatment %in% c("CUR", "CHG", "TMP", "n/a"))
+
+dRESPmsr$Treatment[dRESPmsr$Treatment == "n/a" ] <- "blank" 
+unique(dRESPmsr$Treatment)
+# [1] "CUR"   "blank" "TMP"   "CHG" 
+# 
+# write.csv(dRESPmsr, file = "2021.03.01_respirometrymeasurements.csv", row.names = FALSE)
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+
+# dRESP$MOATS <- factor(dRESP$MOATS)
+# Checking the names of the different levels
+# levels(dRESP$MOATS)
+
+# dRESPmsr <- dRESPmsr %>% filter(!MOATS %in% c("3", "4", "5", "11")) %>%
+#   filter(Treatment %in% c("CUR", "CHG", "TMP")) 
+# 
+# 
+# dRESPmsr <- dRESPmsr %>% filter(!MOATS %in% c("3", "4", "5", "11")) %>%
+#   filter(Treatment %in% c("CUR", "CHG", "TMP", "n/a")) 
+
+
+```
+
+
+
+
+![Creating dRESPmsr- dataframe](/Users/katherinerovinski/GIT/NWFSC.MUK_KRL2019respirometrySLOPES/Picture1_creatingdRESPmsr.png)
+
+
+
+# 3.) dateTime objects 
+```{r 3.) Creating dateTime objects }
+
+#*********************************
+## 3.) Creating dateTime objects  
+#*********************************
+
+dRESPmsr$dateTime <- ""
+dRESPmsr$dateTime <- as.POSIXct(paste(dRESPmsr$Date,
+                                      dRESPmsr$Time), "%d-%B-%y %H:%M:%S", tz="UTC")
+
+# QA check
+dim(dRESPmsr)
+
+dRESPmsr$Time <- as.POSIXct(dRESPmsr$dateTime, format="%H:%M:%S")
+
+
+```
+
+
+
+# 4.) Observation naming
+```{r 4.) Cleaning up observations }
+#*********************************
+## 4.) Cleaning up observations  
+#********************************
+
+#Removing items with faulty sensor names
+dRESPmsr <- subset(dRESPmsr, SensorName != "")
+
+dRESPmsr$SensorName <- str_trim(dRESPmsr$SensorName, side = c("both"))
+dRESPmsr$SensorName <- factor(dRESPmsr$SensorName)
+dim(dRESPmsr)
+
+dRESPmsr <- subset(dRESPmsr, Value != "---")
+
+# Confirming proper number of krill 
+# 76, 4x19 propoer number of animals under observation 
+unique(dRESPmsr$SensorName)
+UniqueSensorNames <- levels(dRESPmsr$SensorName)
+# write.table(UniqueSensorNames, file = "2020.03.15_DRESPmsr_UniqueSensorNames.csv")
+# #kable(UniqueSensorNames)
+
+```
+
+
+
+#5.) Trial ID & Krill ID
+```{r 5.) Creating Trial ID & Krill ID,  echo=FALSE, results=FALSE, message=FALSE, warning=FALSE}
+#*********************************
+## 5.) Creating a Krill ID with Trial in name    
+#*********************************
+
+## First Trial began at 2019-10-28 14:25:01
+## First Trial ended at 2019-10-28 16:37:29
+
+## Second Trial began at 2019-10-28 18:55:21
+## Second Trial ended at 2019-10-28 21:16:45
+
+## Third Trial began at 2019-10-29 14:06:21
+## Third Trial ended at 2019-10-29 16:18:36
+
+## Fourth Trial began at 2019-10-29 17:20:21
+## Fourth Trial ended at 2019-10-29 19:32:01
+
+
+dRESPmsr$TrialID <- ""
+dRESPmsr <- dRESPmsr %>% mutate(TrialID=case_when(
+  
+## First Trial began at 2019-10-28 14:25:01
+## First Trial ended at 2019-10-28 16:37:29
+  
+  ((Time >= as.POSIXct("2019-10-28 14:25:00", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 16:37:30", tz = "UTC"))) ~ "Trial01",
+
+  
+## Second Trial began at 2019-10-28 18:55:21
+## Second Trial ended at 2019-10-28 21:16:45  
+  
+  ((Time >= as.POSIXct("2019-10-28 18:55:20", tz = "UTC")) 
+   & (Time <= as.POSIXct("2019-10-28 21:16:50", tz = "UTC"))) ~ "Trial02",
+
+
+## Third Trial began at 2019-10-29 14:06:21
+## Third Trial ended at 2019-10-29 16:18:36
+
+
+  ((Time >= as.POSIXct("2019-10-29 14:06:18", tz = "UTC")) 
+   & (Time <= as.POSIXct("2019-10-29 16:18:40", tz = "UTC"))) ~ "Trial03",
+
+## Fourth Trial began at 2019-10-29 17:20:21
+## Fourth Trial ended at 2019-10-29 19:32:01
+
+  
+  ((Time >= as.POSIXct("2019-10-29 17:20:18", tz = "UTC")) 
+   & (Time <= as.POSIXct("2019-10-29 19:40:01", tz = "UTC"))) ~ "Trial04",
+
+  TRUE ~"other"
+)) 
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+## new value 
+## dRESPmsr$KrillID
+
+dRESPmsr$KrillID <- ""
+
+dRESPmsr$KrillID <- paste(dRESPmsr$TrialID, "_", dRESPmsr$SensorName, sep="")
+#View(dRESPmsr)
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+unique(dRESPmsr$KrillID)
+
+```
+
+
+
+## 5.a Round Variable
+```{r 5.a Creating Round Variable,  echo=FALSE, results=FALSE, message=FALSE, warning=FALSE}
+
+#*********************************
+## 5.) Creating the Round Variable to best identify the acclimination period
+#*********************************
+# The acclimination period was detailed as the first 10minutes 
+# Eight Rounds of Respirometry were conducted 
+# Creating the rounds of respirometry to later advise outlier elimination, 
+#                                             data filtering consideration
+# 
+dRESPmsr$RESPRound <- ""
+dRESPmsr <- dRESPmsr %>% mutate(RESPRound=case_when(
+
+# ---TRIAL ONE, ROUND---ONE--- #  
+## First Trial,   Round 1 on 2019-10-28 began 14:25:01
+## First Trial,   Round 1 on 2019-10-28 ended 14:44:00
+  ((Time >= as.POSIXct("2019-10-28 14:25:00", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 14:44:00", tz = "UTC"))) ~ "T1Round1",  
+
+# ---TRIAL ONE, ROUND---TWO--- #
+## First Trial,   Round 2 on 2019-10-28 began 14:44:01
+## First Trial,   Round 2 on 2019-10-28 ended 14:58:59
+  ((Time >= as.POSIXct("2019-10-28 14:44:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 14:58:59", tz = "UTC"))) ~ "T1Round2",  
+
+# ---TRIAL ONE, ROUND---THREE--- #
+## First Trial,   Round 3 on 2019-10-28 began 14:59:00
+## First Trial,   Round 3 on 2019-10-28 ended 15:14:00
+  ((Time >= as.POSIXct("2019-10-28 14:59:00", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 15:14:00", tz = "UTC"))) ~ "T1Round3",   
+
+# ---TRIAL ONE, ROUND---FOUR--- #
+## First Trial,   Round 4 on 2019-10-28 began 15:14:01
+## First Trial,   Round 4 on 2019-10-28 ended 15:29:00
+  ((Time >= as.POSIXct("2019-10-28 15:14:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 15:29:00", tz = "UTC"))) ~ "T1Round4",  
+ 
+# ---TRIAL ONE, ROUND---FIVE--- #
+## First Trial,   Round 5 on 2019-10-28 began 15:29:01
+## First Trial,   Round 5 on 2019-10-28 ended 15:44:00
+  ((Time >= as.POSIXct("2019-10-28 15:29:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 15:44:00", tz = "UTC"))) ~ "T1Round5",  
+
+# ---TRIAL ONE, ROUND---SIX--- #
+## First Trial,   Round 6 on 2019-10-28 began 15:44:01
+## First Trial,   Round 6 on 2019-10-28 ended 15:59:00
+  ((Time >= as.POSIXct("2019-10-28 15:44:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 15:59:00", tz = "UTC"))) ~ "T1Round6", 
+ 
+# ---TRIAL ONE, ROUND---SEVEN--- #
+## First Trial,   Round 7 on 2019-10-28 began 15:59:01
+## First Trial,   Round 7 on 2019-10-28 ended 16:14:00
+  ((Time >= as.POSIXct("2019-10-28 15:59:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 16:14:00", tz = "UTC"))) ~ "T1Round7", 
+ 
+# ---TRIAL ONE, ROUND---EIGHT--- #
+## First Trial,   Round 8 on 2019-10-28 began 16:14:01
+## First Trial,   Round 8 on 2019-10-28 ended 16:29:59
+  ((Time >= as.POSIXct("2019-10-28 16:14:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 16:29:59", tz = "UTC"))) ~ "T1Round8",
+
+####
+
+# ---TRIAL TWO, ROUND---ONE--- #  
+## Second Trial,   Round 1 on 2019-10-28 began 18:50:01
+## Second Trial,   Round 1 on 2019-10-28 ended 19:05:00
+  ((Time >= as.POSIXct("2019-10-28 18:50:00", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 19:05:00", tz = "UTC"))) ~ "T2Round1",  
+
+# ---TRIAL TWO, ROUND---TWO--- #
+## Second Trial,   Round 2 on 2019-10-28 began 19:05:01
+## Second Trial,   Round 2 on 2019-10-28 ended 19:20:00
+  ((Time >= as.POSIXct("2019-10-28 19:05:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 19:20:00", tz = "UTC"))) ~ "T2Round2",  
+
+# ---TRIAL TWO, ROUND---THREE--- #
+## Second Trial,   Round 3 on 2019-10-28 began 19:20:01
+## Second Trial,   Round 3 on 2019-10-28 ended 19:35:00
+  ((Time >= as.POSIXct("2019-10-28 19:20:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 19:35:00", tz = "UTC"))) ~ "T2Round3",   
+
+# ---TRIAL TWO, ROUND---FOUR--- #
+## Second Trial,   Round 4 on 2019-10-28 began 19:35:01
+## Second Trial,   Round 4 on 2019-10-28 ended 19:50:00
+  ((Time >= as.POSIXct("2019-10-28 19:35:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 19:50:00", tz = "UTC"))) ~ "T2Round4",  
+ 
+# ---TRIAL TWO, ROUND---FIVE--- #
+## Second Trial,   Round 5 on 2019-10-28 began 19:50:01
+## Second Trial,   Round 5 on 2019-10-28 ended 20:05:00
+  ((Time >= as.POSIXct("2019-10-28 19:50:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 20:05:00", tz = "UTC"))) ~ "T2Round5",  
+
+# ---TRIAL TWO, ROUND---SIX--- #
+## Second Trial,   Round 6 on 2019-10-28 began 20:05:01
+## Second Trial,   Round 6 on 2019-10-28 ended 20:20:00
+  ((Time >= as.POSIXct("2019-10-28 20:05:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 20:20:00", tz = "UTC"))) ~ "T2Round6", 
+ 
+# ---TRIAL TWO, ROUND---SEVEN--- #
+## Second Trial,   Round 7 on 2019-10-28 began 20:20:01
+## Second Trial,   Round 7 on 2019-10-28 ended 20:35:00
+  ((Time >= as.POSIXct("2019-10-28 20:20:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 20:35:00", tz = "UTC"))) ~ "T2Round7", 
+ 
+# ---TRIAL TWO, ROUND---EIGHT--- #
+## Second Trial,   Round 8 on 2019-10-28 began 20:35:01
+## Second Trial,   Round 8 on 2019-10-28 ended 20:50:59
+  ((Time >= as.POSIXct("2019-10-28 20:35:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-28 20:50:59", tz = "UTC"))) ~ "T2Round8",
+
+
+###
+
+
+# ---TRIAL THREE, ROUND---ONE--- #  
+## Second Trial,   Round 1 on 2019-10-29 began 14:00:01
+## Second Trial,   Round 1 on 2019-10-29 ended 14:10:00
+  ((Time >= as.POSIXct("2019-10-29 14:00:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 14:10:00", tz = "UTC"))) ~ "T3Round1",  
+
+# ---TRIAL THREE, ROUND---TWO--- #
+## Second Trial,   Round 2 on 2019-10-29 began 14:10:01
+## Second Trial,   Round 2 on 2019-10-29 ended 14:25:00
+  ((Time >= as.POSIXct("2019-10-29 14:10:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 14:25:00", tz = "UTC"))) ~ "T3Round2",  
+
+# ---TRIAL THREE, ROUND---THREE--- #
+## Second Trial,   Round 3 on 2019-10-29 began 14:25:01
+## Second Trial,   Round 3 on 2019-10-29 ended 14:40:00
+  ((Time >= as.POSIXct("2019-10-29 14:25:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 14:40:00", tz = "UTC"))) ~ "T3Round3",   
+
+# ---TRIAL THREE, ROUND---FOUR--- #
+## Second Trial,   Round 4 on 2019-10-29 began 14:40:01
+## Second Trial,   Round 4 on 2019-10-29 ended 14:55:00
+  ((Time >= as.POSIXct("2019-10-29 14:40:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 14:55:00", tz = "UTC"))) ~ "T3Round4",  
+ 
+# ---TRIAL THREE, ROUND---FIVE--- #
+## Second Trial,   Round 5 on 2019-10-29 began 14:55:01
+## Second Trial,   Round 5 on 2019-10-29 ended 15:10:00
+  ((Time >= as.POSIXct("2019-10-29 14:55:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 15:10:00", tz = "UTC"))) ~ "T3Round5",  
+
+# ---TRIAL THREE, ROUND---SIX--- #
+## Second Trial,   Round 6 on 2019-10-29 began 15:10:01
+## Second Trial,   Round 6 on 2019-10-29 ended 15:25:00
+  ((Time >= as.POSIXct("2019-10-29 15:10:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 15:25:00", tz = "UTC"))) ~ "T3Round6", 
+ 
+# ---TRIAL THREE, ROUND---SEVEN--- #
+## Second Trial,   Round 7 on 2019-10-29 began 15:25:01
+## Second Trial,   Round 7 on 2019-10-29 ended 15:40:00
+  ((Time >= as.POSIXct("2019-10-29 15:25:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 15:40:00", tz = "UTC"))) ~ "T3Round7", 
+ 
+# ---TRIAL THREE, ROUND---EIGHT--- #
+## Second Trial,   Round 8 on 2019-10-29 began 15:40:01
+## Second Trial,   Round 8 on 2019-10-29 ended 15:55:59
+  ((Time >= as.POSIXct("2019-10-29 15:40:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 15:55:59", tz = "UTC"))) ~ "T3Round8",
+
+
+###
+
+
+# ---TRIAL FOUR, ROUND---ONE--- #  
+## Second Trial,   Round 1 on 2019-10-29 began 17:23:01
+## Second Trial,   Round 1 on 2019-10-29 ended 17:38:00
+  ((Time >= as.POSIXct("2019-10-29 17:23:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 17:38:00", tz = "UTC"))) ~ "T4Round1",  
+
+# ---TRIAL FOUR, ROUND---TWO--- #
+## Second Trial,   Round 2 on 2019-10-29 began 17:38:01
+## Second Trial,   Round 2 on 2019-10-29 ended 17:53:00
+  ((Time >= as.POSIXct("2019-10-29 17:38:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 17:53:00", tz = "UTC"))) ~ "T4Round2",  
+
+# ---TRIAL FOUR, ROUND---THREE--- #
+## Second Trial,   Round 3 on 2019-10-29 began 17:53:01
+## Second Trial,   Round 3 on 2019-10-29 ended 18:08:00
+  ((Time >= as.POSIXct("2019-10-29 17:53:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 18:08:00", tz = "UTC"))) ~ "T4Round3",   
+
+# ---TRIAL FOUR, ROUND---FOUR--- #
+## Second Trial,   Round 4 on 2019-10-29 began 18:08:01
+## Second Trial,   Round 4 on 2019-10-29 ended 18:23:00
+  ((Time >= as.POSIXct("2019-10-29 18:08:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 18:23:00", tz = "UTC"))) ~ "T4Round4",  
+ 
+# ---TRIAL FOUR, ROUND---FIVE--- #
+## Second Trial,   Round 5 on 2019-10-29 began 18:23:01
+## Second Trial,   Round 5 on 2019-10-29 ended 18:38:00
+  ((Time >= as.POSIXct("2019-10-29 18:23:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 18:38:00", tz = "UTC"))) ~ "T4Round5",  
+
+# ---TRIAL FOUR, ROUND---SIX--- #
+## Second Trial,   Round 6 on 2019-10-29 began 18:38:01
+## Second Trial,   Round 6 on 2019-10-29 ended 18:53:00
+  ((Time >= as.POSIXct("2019-10-29 18:38:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 18:53:00", tz = "UTC"))) ~ "T4Round6", 
+ 
+# ---TRIAL FOUR, ROUND---SEVEN--- #
+## Second Trial,   Round 7 on 2019-10-29 began 18:53:01
+## Second Trial,   Round 7 on 2019-10-29 ended 19:08:00
+  ((Time >= as.POSIXct("2019-10-29 18:53:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 19:08:00", tz = "UTC"))) ~ "T4Round7", 
+ 
+# ---TRIAL FOUR, ROUND---EIGHT--- #
+## Second Trial,   Round 8 on 2019-10-29 began 19:08:01
+## Second Trial,   Round 8 on 2019-10-29 ended 19:23:59
+  ((Time >= as.POSIXct("2019-10-29 19:08:01", tz = "UTC")) 
+   & (Time < as.POSIXct("2019-10-29 19:23:59", tz = "UTC"))) ~ "T4Round8",
+
+  TRUE ~"other"
+)) 
+
+
+as.factor(dRESPmsr$RESPRound)
+#levels(dRESPmsr$RESPRound)
+
+```
+
+
+
+## 5.b KrillID (grp & time)
+```{r 5.b Grouping by KrillID and then by Time, echo=FALSE, results=FALSE, message=FALSE, warning=FALSE}
+#Grouping by KrillID
+dRESPmsr <- dRESPmsr %>% group_by(KrillID)
+#Order Chronologically
+# dRESPmsr <- dRESPmsr %>% group_by(Time)
+# dRESPmsr <- dRESPmsr [order(as.Date(dRESPmsr$Time, format="%d-%B-%y %H:%M:%S", tz="UTC")),]
+# #Will print tibble
+# dRESPmsr [order(as.Date(dRESPmsr$Time, format="%d-%B-%y %H:%M:%S", tz="UTC")),]
+# dRESPmsr <- dRESPmsr %>% arrange(dRESPmsr(Time), .by_group = TRUE)
+# dRESPmsr <- dRESPmsr %>%
+#   mutate(date = as.Date(dRESPmsr$Time, "%d-%B-%y %H:%M:%S")) %>%
+#   arrange(date)
+# dRESPmsr %>%
+#   mutate(date = as.Date(dRESPmsr$Time, "%d-%B-%y %H:%M:%S")) %>%
+#   arrange(date)
+dRESPmsr <- dRESPmsr[order(dRESPmsr$Time),]
+dRESPmsr[order(dRESPmsr$Time),]
+#Organize by Round
+
+# per minute unit
+dRESPmsr$delta_t <- (dRESPmsr$delta_t)/60
+
+dRESPmsr$Unit <- as.character(dRESPmsr$Unit)
+dRESPmsr$Unit <- "hour"
+
+```
+
+
+
+# 6.) DO Corrections
+```{r 6.) DO trial 3 correction applied to all rounds}
+#*********************************
+## 6.) DO trial 3 correction applied to all rounds   
+#*********************************
+
+# New values to correct the DO values for the temperature in Trial 3 in the dataframe dRESPmsr
+
+dRESPmsr$percentDOassumpt <- ""
+dRESPmsr$assumedSatDOmg <- ""
+dRESPmsr$percentDO <- ""
+dRESPmsr$obseveredSatDOmg <- ""
+dRESPmsr$actualDOmg <- ""
+
+dRESPmsr$percentDOassumpt <- as.numeric(dRESPmsr$percentDOassumpt)
+dRESPmsr$assumedSatDOmg <- as.numeric(dRESPmsr$assumedSatDOmg)
+dRESPmsr$percentDO <- as.numeric(dRESPmsr$percentDO)
+dRESPmsr$obseveredSatDOmg <- as.numeric(dRESPmsr$obseveredSatDOmg)
+dRESPmsr$actualDOmg <- as.numeric(dRESPmsr$actualDOmg)
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+#Correct Temperature
+dRESPmsr$CorTemp <- 11
+
+#Salinity Constant
+dRESPmsr$SalinityConstant <- 30.3
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+# Numeric Corrections to DO value
+dRESPmsr$Value <- as.numeric(dRESPmsr$Value)
+
+dRESPmsr$assumedSatDOmg <- oxySol(dRESPmsr$CorTemp, 
+                                  dRESPmsr$SalinityConstant)
+
+dRESPmsr$percentDOassumpt <- dRESPmsr$Value / dRESPmsr$assumedSatDOmg
+
+dRESPmsr$obseveredSatDOmg <- oxySol(dRESPmsr$CorTemp, dRESPmsr$SalinityConstant)
+
+dRESPmsr$percentDO <- dRESPmsr$Value / dRESPmsr$assumedSatDOmg
+
+dRESPmsr$actualDOmg <- dRESPmsr$percentDO * dRESPmsr$obseveredSatDOmg
+
+names(dRESPmsr)
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+vialVol <- 0.02806 #liters (rather than 28.06mL)
+
+oxygen <- vialVol * dRESPmsr$actualDOmg   
+##mg per liter is the units for Oxygen per vial
+
+dRESPmsr$oxygen <- oxygen * 1000
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+ 
+```
+
+
+
+
+
+# 6.) 90minute Dataframe (selection) 
+```{r 90minute Dataframe (selection) }
+
+burnIn <- 0
+trial_duration <- 1.5
+dRESPmsr_90 <- dRESPmsr %>%
+  group_by(TrialID) %>%
+  filter(delta_t > burnIn & delta_t < trial_duration)
+
+
+```
+
+
+# 7.) Trial Tables
+```{r 7. Particulars per Trial}
+
+# Particulars about each trial
+## Trial 01
+
+# T1dRESPmsr90_UniqueVials <- filter(dRESPmsr_90, TrialID == "Trial01")
+# T2dRESPmsr90_UniqueVials <- filter(dRESPmsr_90, TrialID == "Trial02")
+# T3dRESPmsr90_UniqueVials <- filter(dRESPmsr_90, TrialID == "Trial03")
+# T4dRESPmsr90_UniqueVials <- filter(dRESPmsr_90, TrialID == "Trial04")
+# 
+# unique(T1dRESPmsr90_UniqueVials$KrillID)
+# ## 19 Animals in Trial 01
+# Trial1Animals <- 19
+# 
+# unique(T2dRESPmsr90_UniqueVials$KrillID)
+# ## 11 Animals in Trial 02
+# Trial2Animals <- 11
+# 
+# unique(T3dRESPmsr90_UniqueVials$KrillID)
+# ## 19 Animals in Trial 03
+# Trial3Animals <- 19
+# 
+# unique(T4dRESPmsr90_UniqueVials$KrillID)
+# ## 11 Animals in Trial 04
+# Trial4Animals <- 11
+# 
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# 
+# #*********************************
+# ## Trial # 1
+# #*********************************
+# # Treatments Inside of Trials
+# T1dRESPmsr90_treatmentquery_AMB <- filter(T1dRESPmsr90, Treatment == "AMB")
+# unique(T1dRESPmsr90_treatmentquery_AMB$KrillID)
+# ## QA Check zero AMB animals
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# 
+# T1dRESPmsr90_treatmentquery_CHG <- filter(T1dRESPmsr90, Treatment == "CHG")
+# unique(T1dRESPmsr90_treatmentquery_CHG$KrillID)
+# # [1] "Trial01_KrilLR16"
+# # [2] "Trial01_KrilLR17"
+# # [3] "Trial01_KrILR110"
+# # [4] "Trial01_KriLR116"
+# # [5] "Trial01_KriLR117"
+# ## 4 animals from All Change
+# Trial1_CHG <- 5
+# 
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# 
+# T1dRESPmsr90_treatmentquery_CUR <- filter(T1dRESPmsr90, Treatment == "CUR")
+# unique(T1dRESPmsr90_treatmentquery_CUR$KrillID)
+# # [1] "Trial01_KrilLR11"
+# # [2] "Trial01_KrilLR13"
+# # [3] "Trial01_KrilLR18"
+# # [4] "Trial01_KriLR114"
+# ## 4 animals from Current Conditions
+# Trial1_CUR <- 4
+# 
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# 
+# T1dRESPmsr90_treatmentquery_TMP <- filter(T1dRESPmsr90, Treatment == "TMP")
+# unique(T1dRESPmsr90_treatmentquery_TMP$KrillID)
+# # [1] "Trial01_KrilLR14"
+# # [2] "Trial01_KrilLR15"
+# # [3] "Trial01_KriLR111"
+# # [4] "Trial01_KriLR112"
+# # [5] "Trial01_KriLR113"
+# # [6] "Trial01_KriLR115"
+# # [7] "Trial01_KriLR118"
+# # [8] "Trial01_KriLR119"
+# Trial1_TMP <- 8
+# 
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# 
+# 
+# T1dRESPmsr90_treatmentquery_blank <- filter(T1dRESPmsr90, Treatment == "blank")
+# unique(T1dRESPmsr90_treatmentquery_blank$KrillID)
+# # [1] "Trial01_KrilLR12"
+# # [2] "Trial01_KrilLR19"
+# Trial1_Blanks <- 2
+# 
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# trial1Table <- data.frame(Trial1Animals, Trial1_CHG, Trial1_CUR, Trial1_TMP, Trial1_Blanks)
+# write.csv(trial1Table, "2021.03.05_RespirometryTrial01Table.csv")
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# 
+# #*********************************
+# ## Trial # 2
+# #*********************************
+# 
+# unique(T2dRESPmsr90$KrillID)
+# #  [1] "Trial02_KriLR220" "Trial02_KriLR223" "Trial02_KriLR224"
+# #  [4] "Trial02_KriLR226" "Trial02_KriLR227" "Trial02_KriLR229"
+# #  [7] "Trial02_KriLR230" "Trial02_KriLR232" "Trial02_KriLR233"
+# # [10] "Trial02_KriLR234"
+# # [11] "Trial02_KriLR235"
+# Trial2Animals <- 11
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# 
+# T2dRESPmsr90_treatmentquery_CHG <- filter(T2dRESPmsr90, Treatment == "CHG")
+# unique(T2dRESPmsr90_treatmentquery_CHG$KrillID)
+# # [1] "Trial02_KriLR223"
+# # [2] "Trial02_KriLR227"
+# # [3] "Trial02_KriLR229"
+# # [4] "Trial02_KriLR233"
+# # [5] "Trial02_KriLR235"
+# Trial2_CHG <- 5
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# 
+# T2dRESPmsr90_treatmentquery_CUR <- filter(T2dRESPmsr90, Treatment == "CUR")
+# unique(T2dRESPmsr90_treatmentquery_CUR$KrillID)
+# # [1] "Trial02_KriLR220" "Trial02_KriLR226" "Trial02_KriLR232"
+# # [4] "Trial02_KriLR234"
+# Trial2_CUR <- 4
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# 
+# T2dRESPmsr90_treatmentquery_TMP <- filter(T2dRESPmsr90, Treatment == "TMP")
+# unique(T2dRESPmsr90_treatmentquery_TMP$KrillID)
+# # character(0)
+# Trial2_TMP <- 0
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# 
+# T2dRESPmsr90_treatmentquery_blank <- filter(T2dRESPmsr90, Treatment == "blank")
+# unique(T2dRESPmsr90_treatmentquery_blank$KrillID)
+# # [1] "Trial02_KriLR224"
+# # [2] "Trial02_KriLR230"
+# 
+# Trial2_Blanks <- 2
+# trial2Table <- data.frame(Trial2Animals, Trial2_CHG, Trial2_CUR, Trial2_TMP, Trial2_Blanks)
+# write.csv(trial2Table, "2021.03.05_RespirometryTrial02Table.csv")
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# 
+# 
+# #*********************************
+# ## Trial # 3
+# #*********************************
+# 
+# unique(T3dRESPmsr90$KrillID)
+# #  [1] "Trial03_KRLr3_39" "Trial03_KRLr3_40" "Trial03_KRLr3_41"
+# #  [4] "Trial03_KRLr3_42" "Trial03_KRLr3_43" "Trial03_KRLr3_44"
+# #  [7] "Trial03_KRLr3_45" "Trial03_KRLr3_46" "Trial03_KRLr3_47"
+# # [10] "Trial03_KRLr3_48" "Trial03_KRLr3_49" "Trial03_KRLr3_50"
+# # [13] "Trial03_KRLr3_51" "Trial03_KRLr3_52" "Trial03_KRLr3_53"
+# # [16] "Trial03_KRLr3_54" "Trial03_KRLr3_55" "Trial03_KRLr3_56"
+# # [19] "Trial03_KRLr3_57"
+# Trial3Animals <- 19
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# 
+# 
+# T3dRESPmsr90_treatmentquery_CHG <- filter(T3dRESPmsr90, Treatment == "CHG")
+# unique(T3dRESPmsr90_treatmentquery_CHG$KrillID)
+# # [1] "Trial03_KRLr3_42"
+# # [2] "Trial03_KRLr3_46"
+# # [3] "Trial03_KRLr3_48"
+# # [4] "Trial03_KRLr3_53"
+# # [5] "Trial03_KRLr3_56"
+# Trial3_CHG <- 5
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# 
+# T3dRESPmsr90_treatmentquery_CUR <- filter(T3dRESPmsr90, Treatment == "CUR")
+# unique(T3dRESPmsr90_treatmentquery_CUR$KrillID)
+# # [1] "Trial03_KRLr3_41"
+# # [2] "Trial03_KRLr3_47"
+# # [3] "Trial03_KRLr3_51"
+# # [4] "Trial03_KRLr3_57"
+# Trial3_CUR <- 4
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# 
+# T3dRESPmsr90_treatmentquery_TMP <- filter(T3dRESPmsr90, Treatment == "TMP")
+# unique(T3dRESPmsr90_treatmentquery_TMP$KrillID)
+# # [1] "Trial03_KRLr3_39" "Trial03_KRLr3_40" "Trial03_KRLr3_44"
+# # [4] "Trial03_KRLr3_45" "Trial03_KRLr3_49" "Trial03_KRLr3_50"
+# # [7] "Trial03_KRLr3_54"
+# # [8] "Trial03_KRLr3_55"
+# Trial3_TMP <- 8
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# 
+# T3dRESPmsr90_treatmentquery_blank <- filter(T3dRESPmsr90, Treatment == "blank")
+# unique(T3dRESPmsr90_treatmentquery_blank$KrillID)
+# # [1] "Trial03_KRLr3_43"
+# # [2] "Trial03_KRLr3_52"
+# 
+# Trial3_Blanks <- 2
+# trial3Table <- data.frame(Trial3Animals, Trial3_CHG, Trial3_CUR, Trial3_TMP, Trial3_Blanks)
+# write.csv(trial3Table, "2021.03.05_RespirometryTrial03Table.csv")
+# 
+# unique(T3dRESPmsr90$KrillID)
+# unique(T4dRESPmsr90$KrillID)
+# 
+# 
+# #*********************************
+# ## Trial # 4
+# #*********************************
+# unique(T4dRESPmsr90$KrillID)
+# #  [1] "Trial04_KRLr4_58" "Trial04_KRLr4_59" "Trial04_KRLr4_62"
+# #  [4] "Trial04_KRLr4_65" "Trial04_KRLr4_67" "Trial04_KRLr4_68"
+# #  [7] "Trial04_KRLr4_69" "Trial04_KRLr4_70" "Trial04_KRLr4_71"
+# # [10] "Trial04_KRLr4_75"
+# # [11] "Trial04_KRLr4_76"
+# Trial4Animals <- 11
+# 
+# T4dRESPmsr90_treatmentquery_CHG <- filter(T4dRESPmsr90, Treatment == "CHG")
+# unique(T4dRESPmsr90_treatmentquery_CHG$KrillID)
+# # [1] "Trial04_KRLr4_70"
+# Trial4_CHG <- 1
+# 
+# T4dRESPmsr90_treatmentquery_CUR <- filter(T4dRESPmsr90, Treatment == "CUR")
+# unique(T4dRESPmsr90_treatmentquery_CUR$KrillID)
+# # [1] "Trial04_KRLr4_58" "Trial04_KRLr4_62" "Trial04_KRLr4_65"
+# # [4] "Trial04_KRLr4_67" "Trial04_KRLr4_71" "Trial04_KRLr4_75"
+# # [7] "Trial04_KRLr4_76"
+# Trial4_CUR <- 7
+# 
+# T4dRESPmsr90_treatmentquery_TMP <- filter(T4dRESPmsr90, Treatment == "TMP")
+# unique(T4dRESPmsr90_treatmentquery_TMP$KrillID)
+# Trial4_TMP <- 0
+# 
+# T4dRESPmsr90_treatmentquery_blank <- filter(T4dRESPmsr90, Treatment == "blank")
+# unique(T4dRESPmsr90_treatmentquery_blank$KrillID)
+# # [1] "Trial04_KRLr4_59"
+# # [2] "Trial04_KRLr4_68"
+# # [3] "Trial04_KRLr4_69"
+# 
+# Trial4_Blanks <- 2
+# trial4Table <- data.frame(Trial4Animals, Trial4_CHG, Trial4_CUR, Trial4_TMP, Trial4_Blanks)
+# write.csv(trial4Table, "2021.03.05_RespirometryTrial04Table.csv")
+
+
+
+```
+
+
+## 7.1a) Oxygen Plot
+```{r 7.1a)  Oxygen Plot, warning=FALSE}
+
+oxPLOT1 <- dRESPmsr_90 %>%
+  ggplot(aes(delta_t, actualDOmg)) +
+ # ggplot(aes(delta_t, actualDOmg)) +
+  geom_point(aes(colour = TrialID)) +
+  geom_smooth(aes(colour = TrialID),method = "lm") +
+  facet_wrap(vars(Treatment)) + 
+  xlab("Time(hrs)") +
+  ylab("Actual DO (mg)") +
+  ggtitle("Actual DO (mg) Timeseries")
+
+oxPLOT1
+
+oxPLOT1 + theme(legend.position="bottom")
+# 
+oxPLOT1 + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5))
+
+```
+
+
+
+# 8.) Filtering down the dataframe to needed values
+```{r}
+
+# Selecting from 
+
+names(dRESPmsr_90)
+
+dRESPmsr_90 <- subset( dRESPmsr_90, select = -c(User,
+                                         Mode,
+                                         Phase,         
+                                         Unit.2,
+                                         Amplitude,
+                                         Unit.3,
+                                         Temp,
+                                         Unit.4,
+                                         patm,
+                                         Unit.5,
+                                         Unit.6,
+                                         Error,
+                                         Cal0,
+                                         patm,
+                                         Unit.7,
+                                         T0,
+                                         Unit.8,
+                                         O2.2nd,
+                                         Unit.9,
+                                         Cal2nd,
+                                         Unit.10,         
+                                         T2nd, 
+                                         Unit.11,
+                                         CalPressure,
+                                         Unit.12,
+                                         f1,
+                                         dPhi1,
+                                         dkSv1,
+                                         dPhi2,
+                                         dkSv2,
+                                         m,
+                                         Cal.Mode,
+                                         SignalLEDCurrent,
+                                         ReferenceAmplitude, 
+                                         DeviceSerial, 
+                                         FwVersion, 
+                                         SensorType,
+                                         BatchID,
+                                         Calibration.Date,
+                                         Sensor.lot,
+                                         PreSens.calibrated.Sensor,
+                                         Battery.Voltage,
+                                         Unit.13,
+                                         Sequence,
+                                         FileName))
+
+write.csv(dRESPmsr_90, "KRL_ADLT_EXPOcross_RespirometryDataframe_Summer2019_2021.03.16
+.csv")
+
+```
+
+
+
+
+
+```{r}
+#**************E*N*D*************# 
+#*********************************
+## END OF SCRIPT | END OF DOCUMENT 
+#*********************************
+```
+
+
+## END OF SCRIPT | END OF DOCUMENT
+

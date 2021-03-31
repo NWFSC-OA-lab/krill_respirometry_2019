@@ -1,0 +1,694 @@
+
+---
+title: "Respirometry Trials for Summer Krill 2019"
+output:
+ html_document:
+    df_print: paged
+    code_folding: hide
+    toc: TRUE
+    toc_depth: 4
+    toc_float: true
+    theme: cerulean
+    highlight: haddock
+    smart: false
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+Hello World
+
+Author: OA Lab, NWFSC
+Title: Respirometry Trials for Summer Krill 2019 Slope Generation
+KRL_ADLT_EXPOcross_RESPRsmr2019(2021.03.15)
+Krill, Adult, Exposure Cross Respirometry Summer 2019 (date modified)
+Date: December 2020 - March 2021
+
+
+# Version Check
+```{r 0.1 Version Check , echo=FALSE, results=FALSE, message=FALSE, warning=FALSE}
+#*********************************
+## Version Check
+#********************************* 
+R.version
+
+```
+
+
+
+# Libraries
+```{r 0.0 Libraries , echo=FALSE, results=FALSE, message=FALSE, warning=FALSE}
+#*********************************
+##Libraries
+#********************************* 
+library(stringr)
+library(tidyverse)
+library(plyr)
+library(nlme)
+library(tidyr)
+library(dbplyr)
+library(dplyr)
+library(purrr)
+library(wql)
+library(lubridate)
+library(tibbletime)
+library(arsenal)
+library(compareDF)
+library(todor)
+#for graphing
+library(ggplot2)
+library(ggfortify)
+library(stringr)
+library(nlme)
+library(RColorBrewer)
+library(patchwork)
+#statistical analysis
+library(gdata)
+library(rsq)
+library(doBy)
+library(lme4)
+library(lmerTest)
+#Rnotebooks 
+library(gridExtra)
+library(kableExtra)
+library(todor)
+#metadata
+library(metacsv)
+
+```
+
+
+ 
+# 1.) Setting Working Directory
+```{r 1.) Setting Working Directory }
+#*********************************
+## 1.) Setting Working Directory
+#*********************************
+
+#set working directory to the correct folder
+# just kidding let's us the here package
+
+# setwd("/Users/paul.mcelhany/Downloads")
+setwd("/Users/katherinerovinski/GIT/NWFSC.MUK_KRL2019respirometry90min")
+
+
+```
+
+
+
+
+
+# 2.) Dataframe 
+```{r}
+
+#*********************************
+## 2.) Creating the initial Dataframe, dRESP
+#*********************************
+
+dResp90 <- read.csv(file = "KRL_ADLT_EXPOcross_RespirometryDataframe_Summer2019_(2021.03.16).csv", stringsAsFactors = FALSE)
+dim(dResp90)
+# dRESP <- read_csv(here("01_rawData",
+
+dRESPanimal <-                                                                              read.csv(file = "RespirometryTrials_all.Animal.Info.csv", 
+                        stringsAsFactors = FALSE) 
+dim(dRESPanimal)
+names(dRESPanimal)
+dRESPanimal <- droplevels(filter(dRESPanimal, Treatment != "AMB"))
+
+# "KRL_ADLT_EXPOcross_RespirometryDataframe_Summer2019_(2021.03.15).csv"))
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+```
+
+
+# 3.) Investigating Outliers 
+The following chunks are broken apart to display how the Sparkle function was written.
+
+### 3.e Example of loop and function writting Kate is trying to for each krill
+### 3.1e) take 1 df at a time 
+```{r 3.1e take the first dataframe}
+
+# read the 1 dataframe per trial
+# observe it learn it's secrets
+dim(dResp90)
+
+```
+
+
+### 3.2f) Use the unique tool to get names for each krill
+```{r 3.2f) Use the unique tool to get names for each krill}
+
+unique(dResp90$KrillID)
+unique_dResp90 <- unique(dResp90$KrillID)
+kable(unique_dResp90)
+
+```
+
+
+
+### 3.2g) Create a linear model object for 1 krill 
+```{r 3.2g) Create a linear model object for 1 krill}
+
+df_KrillR11 <- dResp90[dResp90$KrillID == "Trial01_KrilLR11",]
+lm_KrillR11 <- lm(df_KrillR11$oxygen ~ df_KrillR11$delta_t)
+
+```
+
+
+
+### 3.2h) Use the fortify function to get the residuals and cook.sd for each observation
+```{r 3.2h) Use the fortify function to get the residuals and cook.sd for each observation}
+
+#lm_KrillR11 <- lm(df_KrillR11$oxygen ~ df_KrillR11$delta_t)
+#lm_KrillR11 is the referenced linear model object
+df.lm.KrillR11 <- fortify(lm_KrillR11, df_KrillR11)
+#kable(df.lm.KrillR11)
+
+```
+
+
+
+### 3.2i) Indentify which observations have a cooksd score above 4/n
+n is the whole number of observations on that krill in the vial
+```{r 3.2i) Indentify which observations have a cooksd score above 4/n}
+
+# df.lm.KrillR11sat$.cooksd <- df.lm.KrillR11[df.lm.KrillR11$.cooksd <= 4/(length(df.lm.KrillR11$KrillID)), ]
+
+```
+
+
+
+### 3.2j) Use one dataframe to sort another
+```{r 3.2j) Use one dataframe to sort another}
+
+df.lm.KrillR11$.cooksd <= 4/(length(df.lm.KrillR11$KrillID))
+
+
+```
+
+
+# 4.) Krill Sparkle Function (standard krillslopes dataframe)
+```{r 14.) Krill Sparkle Function}
+
+KRILLLmSparkle <- function(dfToFilter) {
+  # Determine the unique list of Krill IDs
+  krillIds <- unique(dfToFilter$KrillID)
+  
+  # Create an empty list to hold the filtered dataframes we'll eventually combine
+  filteredData <- list()
+  filteredDataIndex <- 1
+  
+  # Loop over each Krill ID
+  for (krillId in krillIds) {
+    #print(krillId)
+    # Split the dataframe by the Krill ID
+    filteredKrillIdData <- dfToFilter[dfToFilter$KrillID == krillId,]
+    #print(filteredKrillIdData)
+    
+    # Create the Linear Model of the resulting sub data frame
+    lm_Krill <- lm(filteredKrillIdData$oxygen ~ filteredKrillIdData$delta_t)
+    
+    # Calculate the residuals and cook stdev scores and layer them on as columns into the filtered dataframe
+    df.lm.Krill <- fortify(lm_Krill, filteredKrillIdData) 
+    #print(df.lm.Krill)
+    
+    # Filter out measurements that are outliers based on the cook stdev value
+    df.lm.Krill <- df.lm.Krill[df.lm.Krill$.cooksd <= 4/(length(df.lm.Krill$KrillID)), ]
+    #print(df.lm.Krill)
+    
+    # Merge the filtered data back into the dataframe to return
+    filteredData[[filteredDataIndex]] <- df.lm.Krill
+    filteredDataIndex <- filteredDataIndex + 1
+  }
+  
+  # Combine the list of dataframes into a single dataframe and return it
+  return(do.call(rbind, filteredData))
+}
+
+# stop here and go to next unique krill ID
+
+dResp90.filtered <- KRILLLmSparkle(dResp90)
+
+
+```
+
+
+
+### 4.1a) QA check for observations
+```{r 4.1a QA check on observations}
+
+dResp90.filtered$Tmie <- as_datetime(dResp90.filtered$Time)
+dResp90.filtered  <- dResp90.filtered [order(dResp90.filtered$Time),]
+dRESPmsr[order(dRESPmsr$Time),]
+
+
+QAtrial1 <- subset(dResp90.filtered, dResp90.filtered$TrialID == "Trial01")
+QAtrial2 <- subset(dResp90.filtered, dResp90.filtered$TrialID == "Trial02")
+QAtrial3 <- subset(dResp90.filtered, dResp90.filtered$TrialID == "Trial03")
+QAtrial4 <- subset(dResp90.filtered, dResp90.filtered$TrialID == "Trial04")
+
+head(QAtrial1$Time)
+# [1] "2019-10-28 14:25:03"
+head(QAtrial2$Time)
+# [1] "2019-10-28 18:55:23"
+head(QAtrial3$Time)
+# [1] "2019-10-29 14:06:23"
+head(QAtrial4$Time)
+# [1] "2019-10-29 17:20:23"
+
+```
+
+
+
+
+# 8.) Analysis, Respirometry - Creating the Slope Function 
+```{r 8.) Analysis, Respirometry - Creating the Slope Function}
+#*********************************
+## 8.) Analysis, Respirometry - Creating the Slope Function  
+#*********************************  
+
+#slope function of 2 vectors
+slope <- function(y,x){
+  return(lm(y~x, na.action = na.omit)$coefficients[2])
+}
+  
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+cSlopes <- by(dResp90.filtered , dResp90.filtered$KrillID, function(x){ slope(x$oxygen, x$delta_t)})
+
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+#creating a data frame instead of a list 
+ds <- as.data.frame(sapply(cSlopes, I))
+#having row names be a variable in a column to be able to pull it out for later merging 
+ds$TrialID<- row.names(ds)
+
+
+```
+
+
+
+# 9.) Merging ds and dRESPmsr (create dtotal)
+```{r 9.) Merging ds and dRESPmsr}
+#add column to dslopes that's KrillID
+#View(dref)
+ds$KrillID <- row.names(ds)
+#View(dslopes)
+dtotal <- merge(dResp90.filtered, ds, by = "KrillID")
+#View(dtotal)
+
+```
+
+
+
+# 10.) Krill ID as a factor & Grouping by Krill ID
+```{r 10.) Krill ID as a factor & Grouping by Krill ID}
+dtotal$KrillID <- factor(dtotal$KrillID)
+nlevels(dtotal$KrillID)
+
+
+```
+60 is the number of vials when Ambient Treatment is excluded
+
+
+# 11.) Analysis, Respirometry - Creating Slope Functions & Linear Models  
+```{r 11.) Analysis, Respirometry - Creating Slope Functions & Linear Models  }
+#*********************************
+## 11.1) Creating the ds dataframe
+#*********************************
+# #get slopes and r^2 values from dtotal 
+
+dSlopes <- data.frame(KrillID = levels(dtotal$KrillID))
+# dSlopes$slope <- NA
+# dSlopes$rsq <- NA
+
+for(i in 1:length(dSlopes$KrillID)){
+   m <- lm(oxygen ~ delta_t,
+                         dtotal[dtotal$KrillID == dSlopes$KrillID[i],],
+                         na.action=na.omit)
+  dSlopes$slope[i] <- m$coefficients[2]
+  dSlopes$rsq[i] <- summary(m)$r.squared
+}
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+dSlopes$SensorName <- ""
+
+dSlopes <- dSlopes %>% group_by(KrillID)
+dRESPanimal <- dRESPanimal %>% group_by(SensorName)
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+dSlopes$KrillID <- as.character(dSlopes$KrillID)
+dSlopes$SensorName <- dRESPanimal$SensorName
+dSlopes$TrialID <- dRESPanimal$TrialID
+dSlopes$MOATS <- dRESPanimal$MOATS
+dSlopes$Treatment<- dRESPanimal$Treatment
+dSlopes$LoadingLocation<- dRESPanimal$LoadingLocation
+dSlopes$VialNum<- dRESPanimal$GlassVialNumber
+dSlopes$TelsonLength<- dRESPanimal$TelsonLength..mm.
+dSlopes$WetWeight<- dRESPanimal$Size
+
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+```
+
+
+### 11.1 Boxplot of Slopes (Prior to Blank Correction)
+```{r 7.1a) Oxygen Plot, warning=FALSE}
+
+
+slopeplot1 <- ggplot(dSlopes, aes(Treatment, slope)) +
+            geom_jitter(color = "grey") +
+            geom_boxplot(notch = TRUE, outlier.shape = NA, colour = "blue") +
+            # facet_wrap(~TrialID) +
+            ggtitle("Slopes (Prior to Blank Correction) by Treatment") +
+            theme_bw()
+
+slopeplot1
+slopeplot1 + theme(legend.position="bottom")
+slopeplot1 + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5))
+
+```
+
+
+
+
+# 12.) Analysis, Respirometry - Correcting the Slope for Blanks
+```{r 12.) Analysis, Respirometry - Correcting the Slope for Blanks}
+
+#*********************************
+## 21.) Analysis, Respirometry - Correcting the Slope for Blanks 
+#*********************************
+
+#blank corrected slope and blank-size corrected slope
+## need to correct all slopes with the blanks' slope
+## this is the background respiration of whatever phtyos and instrument drift
+## create a mean blank slope per trial
+## merge with the master(krill slopes) and "correct" all slopes against mean value (per trial)
+# x is equal to the blank vials  
+
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+# Creating four separate means from the blank vials per trial
+x <- subset(dSlopes, MOATS == "blank")
+# x <- droplevels(filter(x, Treatment != "AMB"))
+# x <- droplevels(filter(x, Treatment != "CUR"))
+# x <- droplevels(filter(x, Treatment != "CHG"))
+
+
+xtrial1 <- subset(x, x$TrialID == "Trial01")
+xtrial2 <- subset(x, x$TrialID == "Trial02")
+xtrial3 <- subset(x, x$TrialID == "Trial03")
+xtrial4 <- subset(x, x$TrialID == "Trial04")
+
+blankmeanslope1 <- mean(xtrial1$slope)
+blankmeanslope2 <- mean(xtrial2$slope)
+blankmeanslope3 <- mean(xtrial3$slope)
+blankmeanslope4 <- mean(xtrial4$slope)
+
+BlankSlopes <- as.table(blankmeanslope1, 
+                             blankmeanslope2,
+                             blankmeanslope3,
+                             blankmeanslope4)
+
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+#Creating new corrected variables for slopes adjusted for blank vials and size of animal
+dSlopes$CorrSlope <- ""
+dSlopes$CorrSlope <- as.numeric(dSlopes$CorrSlope)
+
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# Conditional Statement directing certain means to their respective trials
+# take absolute values not to add a negative nubmer
+
+dSlopes <- dSlopes %>% mutate(CorrSlope=case_when(
+    (dSlopes$MOATS == "blank" ~ dSlopes$slope),
+    (dSlopes$TrialID == "Trial01" ~ dSlopes$slope-((blankmeanslope1))),
+    (dSlopes$TrialID == "Trial02" ~ dSlopes$slope-((blankmeanslope2))),
+    (dSlopes$TrialID == "Trial03" ~ dSlopes$slope-((blankmeanslope3))),
+    (dSlopes$TrialID == "Trial04" ~ dSlopes$slope-((blankmeanslope4))),
+    TRUE ~ as.numeric(0)
+))
+
+
+# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+# Correcting for the size of the animal 
+dSlopes$WetWeight <- as.numeric(dSlopes$WetWeight)
+dSlopes$CorrWeightSlope <- dSlopes$CorrSlope/dSlopes$WetWeight
+
+#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+
+
+#create plots and perhaps convert to larger units
+
+``` 
+
+
+
+### 12.1) Boxplot of Corrected Slopes
+```{r 12.1a) Boxplot of Corrected Slopes, warning=FALSE}
+
+dSlopes<- droplevels(filter(dSlopes, Treatment != "n/a"))
+
+
+slopeplot2 <- ggplot(dSlopes, aes(Treatment, CorrWeightSlope)) +
+            geom_jitter(color = "grey") +
+            geom_boxplot(notch = TRUE, outlier.shape = NA, colour = "black") +
+            # facet_wrap(~TrialID) +
+            xlab("Treatment") +
+            ylab("(µg)/hr per Krill gram") +
+            ggtitle("Slopes with Blank Correction by Treatment (Vial Oxygen (µg)/hr per gram of Krill)") +
+            theme_bw()
+
+slopeplot2
+slopeplot2 + theme(legend.position="bottom")
+slopeplot2 + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5))
+
+```
+
+
+
+# 13.) Summary Statisitics on the Unfiltered Dataframe dSlopes
+```{r 13. Summary Statisitics on the Unfiltered Dataframe dSlopes}
+
+#Ensuring dSlopes have blanks filtered out for summary table
+dSlopes<- droplevels(filter(dSlopes, Treatment != "n/a"))
+
+dSlopes.summary <- dSlopes %>% group_by(Treatment) %>%
+  dplyr::summarize(sd = sd(CorrWeightSlope, na.rm = TRUE), 
+            mean = mean(CorrWeightSlope, na.rm = TRUE), 
+            median = median(CorrWeightSlope, na.rm = TRUE),
+            IQR = IQR(CorrWeightSlope, na.rm = TRUE),
+            n = n()) %>%
+  mutate(se = sd/sqrt(n)) %>%
+  mutate(ci = se*1.96)
+dSlopes.summary
+
+kable(dSlopes.summary, digits = 4)
+
+write.csv(dSlopes.summary, "KRL_ADLT_EXPOcross_dSlopeSummaryStats_2021.03.16.csv")
+```
+
+
+
+# 14.) Boxplots Corrected Slopes
+```{r 14.) Boxplots Corrected Slopes}
+dSlopes_boxplot <- ggplot(dSlopes, aes(Treatment, CorrWeightSlope)) +
+            # geom_jitter(color = "grey") +
+            geom_jitter(data = dSlopes, aes(Treatment, CorrWeightSlope)) +
+            # geom_jitter(data = krillslopes80.filtered, aes(Treatment, slope)) +
+            # geom_jitter(data = krillslopes70.filtered, aes(Treatment, slope)) +
+            # geom_jitter(data = kSlopes.filtered, aes(Treatment, slope)) +
+            # geom_jitter(aes(colour = Treatment)) +
+            geom_boxplot(notch = TRUE, outlier.shape = NA, colour = "green") +
+            geom_point(data = dSlopes.summary, aes(x=Treatment, y=mean), size=5, color = "purple") + 
+            geom_errorbar(data = dSlopes.summary, 
+                          aes(x=Treatment, y=mean, ymin = mean-sd, ymax = mean+sd), 
+                          color = "blue") +
+            geom_errorbar(data = dSlopes.summary,
+                          aes(x=Treatment, y=mean, ymin = mean-ci, ymax = mean+ci),
+                          colour = "red") +
+            # facet_wrap(~TrialID) +
+            xlab("Treatment") +
+            ylab("(µg of Vial Oxygen)/hr per Krill gram") +
+            ggtitle("Corrected Slope Summary Plot") +
+            theme_bw() 
+
+dSlopes_boxplot
+
+dSlopes_boxplot
+dSlopes_boxplot + theme(legend.position="bottom")
+dSlopes_boxplot + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5))
+
+```
+
+The purple dots represent the mean- all trials included
+Confidence Intervals set to 95
+Green boxplots show from the 25th percentile to the 75th percentile
+error bars +/- SD shown in blue
+error bars(CI) +/- our confidence intervals- shown in red
+
+
+
+# 15.) Descriptive Statisitics 
+```{r 15.) Descriptive Statisitics}
+library(tidyr)
+#Remove NAs
+#krill <- na.omit(krill)
+#Calculate mean and standard deviation for each treatment per each dataset
+# blanks are to be removed from treatments
+
+dSlopes_Avg <- tapply(dSlopes$CorrWeightSlope, (dSlopes$Treatment), mean)
+dSlopes_Med <- tapply(dSlopes$CorrWeightSlope, (dSlopes$Treatment), median)
+dSlopes_Std <- tapply(dSlopes$CorrWeightSlope, (dSlopes$Treatment), sd)
+
+
+#Put it all together
+Slope_Stats <- cbind(dSlopes_Avg, dSlopes_Med, dSlopes_Std)
+Slope_Stats <- data_frame(dSlopes_Avg, dSlopes_Med, dSlopes_Std)
+
+colnames(Slope_Stats) [1:3] <-c("Avg All Points Corrected Slopes", "Med All Points Corrected Slopes", "All Points Corrected Slopes SD")
+
+write.csv(Slope_Stats, "KRL_ADLT_EXPOcross_SlopeStats_2021.03.16.csv")
+kable(Slope_Stats)
+
+```
+
+
+
+
+# 16.) Fitting my Linear Mixed-Effects Models to my Dataframes 
+```{r Repeated measures analysis}
+#Using a mixed model to find significant differences bertween MOATs
+#library(nlme)
+library(lme4)
+library(lmerTest)
+
+# Corrected Slopes , Treatment taking into account MOATS
+# Just checking to make sure dSlopes didn't contain blanks
+dSlopes<- droplevels(filter(dSlopes, Treatment != "n/a"))
+
+
+```
+
+
+### 16.a) 1hr Dataframe - LMER
+```{r, 16.a) 1hr Dataframe - LMER}
+
+lmer.dSlopes <- lmer(CorrWeightSlope ~ Treatment + (1|MOATS), data = dSlopes)
+summary(lmer.dSlopes)
+# All Change Against Current 
+# All Change Against High Temperature
+```
+No Treatment Effect Found
+Random Effects Model variance accounting for a possible MOATs effect remains significantly small.
+No treatment effect observed. 
+Neither correlation or T values between "All Change(CHG)" to "Current(CUR)" and "High Temperature(TMP)" 
+This model doesn't consider High Temperature directly against Current
+Model re-ogranized/re-leveled below
+
+
+The Current Conditions to Hight Temperature comparison did not display a treatment effect. 
+
+Possible reasons for the variance include only 51 animals in trial, there are not enough observations to smooth the slopes. 
+16 animals from the "All Change" treatment were in included across four trials.
+20 animals from the "Current" treatment were in included across four trials.
+16 animals from the "High Temperarure" treatment were in included across four trials.
+(totals only 52 animals)
+
+so signal over the noise- why?
+
+1hr may not have allowed enough observations to show a disernable difference across treatments.
+However, Krill could just be proving to be a robust organism, able to withstand a cross stress environment. 
+It's more likely that sample size was small.
+
+
+
+When comparing Current against "High Temperature" and "All Change" the T values remain small but the TMP to CUR is somewhat larger. 
+
+Still, no discernible treatment effect, no discernible MOATS effect. 
+
+
+The variance around a MOATs effect remains significantly small in this 70% Threshold dataset.
+No treatment effect observed.
+Model re-organized/re-leveled below to compare "Current" against "High Temperature" directly
+
+
+No discernible treatment effect, no discernible MOATS effect. 
+None of the "threshold confined" datasets displayed a MOATs or Treatment Effect.
+
+
+Below shows the comparison is slopes values when all data points were considered. 
+
+
+# 17.) All Points "dSlopes" Dataframe - LMER
+```{r, 17.) All Points Dataframe - LMER}
+lmer.dSlopes<- lmer(CorrWeightSlope ~ Treatment + (1|MOATS), data = dSlopes)
+summary(lmer.dSlopes)
+# All Change Against Current 
+# All Change Against High Temperature
+```
+
+
+The variance around a MOATs effect remains so significantly small.
+No MOATs effect
+No treatment effect observed.
+Model re-organized/re-leveled below to compare "Current" against "High Temperature" directly
+
+
+#### 17.a) All Points - LMER releved Current 1st
+```{r 17.a) All Points - LMER}
+
+levels(dSlopes$Treatment)
+
+dSlopes$Treatment <- fct_relevel(dSlopes$Treatment, "CUR")
+lmer.dSlopes <- lmer(CorrWeightSlope ~ Treatment + (1|MOATS), data = dSlopes)
+summary(lmer.dSlopes)
+
+```
+
+
+
+# 18.) Writing Documents 
+```{r 29.a All Points}
+write.csv(dSlopes, file = "2021.03.17_Slopes_allpts.csv", row.names = FALSE)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+#**************E*N*D*************# 
+#*********************************
+## END OF SCRIPT | END OF DOCUMENT 
+#*********************************
+```
+
+
+## END OF SCRIPT | END OF DOCUMENT
+
+
+
+
+
+
+
+
+
+
+
+
