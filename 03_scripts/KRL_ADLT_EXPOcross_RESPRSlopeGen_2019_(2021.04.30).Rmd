@@ -89,7 +89,7 @@ library(metacsv)
 # just kidding let's us the here package
 
 # setwd("/Users/paul.mcelhany/Downloads")
-setwd("/Users/katherinerovinski/GIT/NWFSC.MUK_KRL2019respirometry90min")
+# setwd("/Users/katherinerovinski/GIT/NWFSC.MUK_KRL2019respirometry90min")
 
 
 ```
@@ -105,18 +105,17 @@ setwd("/Users/katherinerovinski/GIT/NWFSC.MUK_KRL2019respirometry90min")
 ## 2.) Creating the initial Dataframe, dRESP
 #*********************************
 
-dResp90 <- read.csv(file = "KRL_ADLT_EXPOcross_RespirometryDataframe_Summer2019_2021.03.29
-.csv", stringsAsFactors = FALSE)
-dim(dResp90)
-# dRESP <- read_csv(here("01_rawData",
 
-dRESPanimal <-                                                                              read.csv(file = "RespirometryTrials_all.Animal.Info.csv", 
-                        stringsAsFactors = FALSE) 
+dResp90 <- read_csv(here::here("02_processedData","KRL_ADLT_EXPOcross_RespirometryDataframe_Summer2019_2021.04.30.csv"))
+
+
+dRESPanimal <- read_csv(here::here("01_rawData","RespirometryTrials_all.Animal.Info.csv"))
+
+
 dim(dRESPanimal)
 names(dRESPanimal)
 dRESPanimal <- droplevels(filter(dRESPanimal, Treatment != "AMB"))
 
-# "KRL_ADLT_EXPOcross_RespirometryDataframe_Summer2019_(2021.03.15).csv"))
 
 #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
 
@@ -378,6 +377,30 @@ slopeplot1 + theme(legend.position="bottom", plot.title = element_text(hjust = 0
 
 
 
+### 11.2) Removing Positive Slopes
+```{r}
+
+dSlopes <- droplevels(filter(dSlopes, slope < 0.0))
+
+slopeplot2 <- ggplot(dSlopes, aes(Treatment, slope)) +
+            geom_jitter(color = "grey") +
+            geom_boxplot(notch = TRUE, outlier.shape = NA, colour = "blue") +
+            xlab("Treatment") +
+            ylab("Oxygen Consumption") +
+            # facet_wrap(~TrialID) +
+            ggtitle("Slopes (Prior to Blank Correction) by Treatment") +
+            theme_bw()
+
+slopeplot2
+slopeplot2 + theme(legend.position="bottom")
+slopeplot2 + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5))
+
+
+```
+
+
+
+
 
 # 12.) Analysis, Respirometry - Correcting the Slope for Blanks
 ```{r 12.) Analysis, Respirometry - Correcting the Slope for Blanks}
@@ -457,7 +480,7 @@ dSlopes$CorrWeightSlope <- dSlopes$CorrSlope/dSlopes$WetWeight
 dSlopes<- droplevels(filter(dSlopes, Treatment != "n/a"))
 
 
-slopeplot2 <- ggplot(dSlopes, aes(Treatment, CorrWeightSlope)) +
+slopeplot3 <- ggplot(dSlopes, aes(Treatment, CorrWeightSlope)) +
             geom_jitter(color = "grey") +
             geom_boxplot(notch = TRUE, outlier.shape = NA, colour = "black") +
             # facet_wrap(~TrialID) +
@@ -466,9 +489,9 @@ slopeplot2 <- ggplot(dSlopes, aes(Treatment, CorrWeightSlope)) +
             ggtitle("Corrected Oxygen Consumption Slopes by Treatment (Vial Oxygen (µg)/hr per gram of Krill)") +
             theme_bw()
 
-slopeplot2
-slopeplot2 + theme(legend.position="bottom")
-slopeplot2 + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5))
+slopeplot3
+slopeplot3 + theme(legend.position="bottom")
+slopeplot3 + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5))
 
 ```
 
@@ -657,7 +680,7 @@ summary(lmer.dSlopes)
 
 # 18.) Writing Documents 
 ```{r 29.a All Points}
-write.csv(dSlopes, file = "2021.03.17_Slopes_allpts.csv", row.names = FALSE)
+write.csv(dSlopes, file = "KRL_ADLT_exposure_dSlopes_2021.04.30.csv", row.names = FALSE)
 ```
 
 

@@ -89,7 +89,9 @@ library(metacsv)
 # just kidding let's us the here package
 
 # setwd("/Users/paul.mcelhany/Downloads")
-setwd("/Users/katherinerovinski/GIT/NWFSC.MUK_KRL2019respirometry90min")
+# setwd("/Users/katherinerovinski/GIT/NWFSC.MUK_KRL2019respirometry90min")
+
+## using the here package
 
 
 ```
@@ -102,39 +104,26 @@ setwd("/Users/katherinerovinski/GIT/NWFSC.MUK_KRL2019respirometry90min")
 #*********************************
 ## 2.) Creating the initial Dataframe, dRESP
 #*********************************
+# Fitbox4 PRESENSOR raw data 
+dRESP <- read_csv(here::here("01_rawData","KRILL_Resp_alltrials.csv"))
+write_meta_template(dRESP, here::here("01_rawData","KRILL_Resp_alltrials.csv"),
+                            embedded = TRUE)
 
-## Method 1 - 1 file for the four trials
-#get all the files in the defined working directory that are in csv format  
-dRESP <- read.csv(file = "KRILL_Resp_alltrials.csv", stringsAsFactors = FALSE)
-dim(dRESP)
-# dRESP <- read_csv(here("01_rawData","KRILL_Resp_alltrials.csv"))
 
 #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
 
 
 # dRESPanimal represents just the animal, vial, MOATs, etc.  
-dRESPanimal <-                                                                              read.csv(file = "RespirometryTrials_all.Animal.Info.csv", 
-                        stringsAsFactors = FALSE) 
-# dRESPanimal <- read_csv(here("RespirometryTrials_all.Animal.Info.csv"))
-
-dim(dRESPanimal)
-names(dRESPanimal)
+dRESPanimal <- read_csv(here::here("01_rawData","RespirometryTrials_all.Animal.Info.csv"))
 dRESPanimal <- droplevels(filter(dRESPanimal, Treatment != "AMB"))
+write_meta_template(dRESPanimal, here::here("01_rawData","RespirometryTrials_all.Animal.Info.csv"),
+                            embedded = TRUE)
 
-
-# a <- read_meta("RespirometryTrials_all.Animal.Info.csv")
-# get_a <- get_attributes(a)
-
-# a <- get_attributes()
-# write.csv(a$gen_attributes, file = "2021.03.03_attributes.csv")
-# write.csv(a$var_attributes, file = "2021.03.03_var_attributes.csv")
-# write.csv(dRESPanimal, file = "2021.03.01_krillanimaldata.csv", row.names = FALSE)
 
 #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
 
 
 #dRESPmsr represents the measurements made by the presense optical device for Dissolved Oxygen 
-
 dRESPmsr <- merge(dRESP, 
                   dRESPanimal, 
                   by="SensorName")
@@ -148,22 +137,6 @@ dRESPmsr <- dRESPmsr %>% filter(!MOATS %in% c("3", "4", "5", "11")) %>%
 dRESPmsr$Treatment[dRESPmsr$Treatment == "n/a" ] <- "blank" 
 unique(dRESPmsr$Treatment)
 # [1] "CUR"   "blank" "TMP"   "CHG" 
-# 
-# write.csv(dRESPmsr, file = "2021.03.01_respirometrymeasurements.csv", row.names = FALSE)
-#|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
-
-
-# dRESP$MOATS <- factor(dRESP$MOATS)
-# Checking the names of the different levels
-# levels(dRESP$MOATS)
-
-# dRESPmsr <- dRESPmsr %>% filter(!MOATS %in% c("3", "4", "5", "11")) %>%
-#   filter(Treatment %in% c("CUR", "CHG", "TMP")) 
-# 
-# 
-# dRESPmsr <- dRESPmsr %>% filter(!MOATS %in% c("3", "4", "5", "11")) %>%
-#   filter(Treatment %in% c("CUR", "CHG", "TMP", "n/a")) 
-
 
 ```
 
@@ -630,9 +603,22 @@ names(dRESPmsr)
 
 #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
 
-vialVol <- 0.02806 #liters (rather than 28.06mL)
+dRESPmsr$assumed_vialVol <- ""
+dRESPmsr$assumed_vialVol <- 0.02806 #liters (rather than 28.06mL)
 
-oxygen <- vialVol * dRESPmsr$actualDOmg   
+dRESPmsr$unique_vialVol <- ""
+
+dRESPmsr$Size <- as.numeric(dRESPmsr$Size)
+
+
+# volume assuming krill have a density of 1 ml/g.
+dRESPmsr$krilldensity <- ""
+dRESPmsr$krilldensity <- as.numeric(dRESPmsr$krilldensity)
+dRESPmsr$krilldensity <- ifelse(dRESPmsr$MOATS=="blank", 0, (dRESPmsr$Size) * 0.001)
+
+
+dRESPmsr$unique_vialVol <- 0.02806 - dRESPmsr$krilldensity
+oxygen <- unique_vialVol * dRESPmsr$actualDOmg   
 ##mg per liter is the units for Oxygen per vial
 
 dRESPmsr$oxygen <- oxygen * 1000
@@ -659,240 +645,8 @@ dRESPmsr_90 <- dRESPmsr %>%
 ```
 
 
-# 7.) Trial Tables
-```{r 7. Particulars per Trial}
 
-# Particulars about each trial
-## Trial 01
-
-# T1dRESPmsr90_UniqueVials <- filter(dRESPmsr_90, TrialID == "Trial01")
-# T2dRESPmsr90_UniqueVials <- filter(dRESPmsr_90, TrialID == "Trial02")
-# T3dRESPmsr90_UniqueVials <- filter(dRESPmsr_90, TrialID == "Trial03")
-# T4dRESPmsr90_UniqueVials <- filter(dRESPmsr_90, TrialID == "Trial04")
-# 
-# unique(T1dRESPmsr90_UniqueVials$KrillID)
-# ## 19 Animals in Trial 01
-# Trial1Animals <- 19
-# 
-# unique(T2dRESPmsr90_UniqueVials$KrillID)
-# ## 11 Animals in Trial 02
-# Trial2Animals <- 11
-# 
-# unique(T3dRESPmsr90_UniqueVials$KrillID)
-# ## 19 Animals in Trial 03
-# Trial3Animals <- 19
-# 
-# unique(T4dRESPmsr90_UniqueVials$KrillID)
-# ## 11 Animals in Trial 04
-# Trial4Animals <- 11
-# 
-# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
-# 
-# #*********************************
-# ## Trial # 1
-# #*********************************
-# # Treatments Inside of Trials
-# T1dRESPmsr90_treatmentquery_AMB <- filter(T1dRESPmsr90, Treatment == "AMB")
-# unique(T1dRESPmsr90_treatmentquery_AMB$KrillID)
-# ## QA Check zero AMB animals
-# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
-# 
-# T1dRESPmsr90_treatmentquery_CHG <- filter(T1dRESPmsr90, Treatment == "CHG")
-# unique(T1dRESPmsr90_treatmentquery_CHG$KrillID)
-# # [1] "Trial01_KrilLR16"
-# # [2] "Trial01_KrilLR17"
-# # [3] "Trial01_KrILR110"
-# # [4] "Trial01_KriLR116"
-# # [5] "Trial01_KriLR117"
-# ## 4 animals from All Change
-# Trial1_CHG <- 5
-# 
-# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
-# 
-# T1dRESPmsr90_treatmentquery_CUR <- filter(T1dRESPmsr90, Treatment == "CUR")
-# unique(T1dRESPmsr90_treatmentquery_CUR$KrillID)
-# # [1] "Trial01_KrilLR11"
-# # [2] "Trial01_KrilLR13"
-# # [3] "Trial01_KrilLR18"
-# # [4] "Trial01_KriLR114"
-# ## 4 animals from Current Conditions
-# Trial1_CUR <- 4
-# 
-# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
-# 
-# T1dRESPmsr90_treatmentquery_TMP <- filter(T1dRESPmsr90, Treatment == "TMP")
-# unique(T1dRESPmsr90_treatmentquery_TMP$KrillID)
-# # [1] "Trial01_KrilLR14"
-# # [2] "Trial01_KrilLR15"
-# # [3] "Trial01_KriLR111"
-# # [4] "Trial01_KriLR112"
-# # [5] "Trial01_KriLR113"
-# # [6] "Trial01_KriLR115"
-# # [7] "Trial01_KriLR118"
-# # [8] "Trial01_KriLR119"
-# Trial1_TMP <- 8
-# 
-# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
-# 
-# 
-# T1dRESPmsr90_treatmentquery_blank <- filter(T1dRESPmsr90, Treatment == "blank")
-# unique(T1dRESPmsr90_treatmentquery_blank$KrillID)
-# # [1] "Trial01_KrilLR12"
-# # [2] "Trial01_KrilLR19"
-# Trial1_Blanks <- 2
-# 
-# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
-# trial1Table <- data.frame(Trial1Animals, Trial1_CHG, Trial1_CUR, Trial1_TMP, Trial1_Blanks)
-# write.csv(trial1Table, "2021.03.05_RespirometryTrial01Table.csv")
-# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
-# 
-# #*********************************
-# ## Trial # 2
-# #*********************************
-# 
-# unique(T2dRESPmsr90$KrillID)
-# #  [1] "Trial02_KriLR220" "Trial02_KriLR223" "Trial02_KriLR224"
-# #  [4] "Trial02_KriLR226" "Trial02_KriLR227" "Trial02_KriLR229"
-# #  [7] "Trial02_KriLR230" "Trial02_KriLR232" "Trial02_KriLR233"
-# # [10] "Trial02_KriLR234"
-# # [11] "Trial02_KriLR235"
-# Trial2Animals <- 11
-# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
-# 
-# T2dRESPmsr90_treatmentquery_CHG <- filter(T2dRESPmsr90, Treatment == "CHG")
-# unique(T2dRESPmsr90_treatmentquery_CHG$KrillID)
-# # [1] "Trial02_KriLR223"
-# # [2] "Trial02_KriLR227"
-# # [3] "Trial02_KriLR229"
-# # [4] "Trial02_KriLR233"
-# # [5] "Trial02_KriLR235"
-# Trial2_CHG <- 5
-# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
-# 
-# T2dRESPmsr90_treatmentquery_CUR <- filter(T2dRESPmsr90, Treatment == "CUR")
-# unique(T2dRESPmsr90_treatmentquery_CUR$KrillID)
-# # [1] "Trial02_KriLR220" "Trial02_KriLR226" "Trial02_KriLR232"
-# # [4] "Trial02_KriLR234"
-# Trial2_CUR <- 4
-# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
-# 
-# T2dRESPmsr90_treatmentquery_TMP <- filter(T2dRESPmsr90, Treatment == "TMP")
-# unique(T2dRESPmsr90_treatmentquery_TMP$KrillID)
-# # character(0)
-# Trial2_TMP <- 0
-# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
-# 
-# T2dRESPmsr90_treatmentquery_blank <- filter(T2dRESPmsr90, Treatment == "blank")
-# unique(T2dRESPmsr90_treatmentquery_blank$KrillID)
-# # [1] "Trial02_KriLR224"
-# # [2] "Trial02_KriLR230"
-# 
-# Trial2_Blanks <- 2
-# trial2Table <- data.frame(Trial2Animals, Trial2_CHG, Trial2_CUR, Trial2_TMP, Trial2_Blanks)
-# write.csv(trial2Table, "2021.03.05_RespirometryTrial02Table.csv")
-# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
-# 
-# 
-# #*********************************
-# ## Trial # 3
-# #*********************************
-# 
-# unique(T3dRESPmsr90$KrillID)
-# #  [1] "Trial03_KRLr3_39" "Trial03_KRLr3_40" "Trial03_KRLr3_41"
-# #  [4] "Trial03_KRLr3_42" "Trial03_KRLr3_43" "Trial03_KRLr3_44"
-# #  [7] "Trial03_KRLr3_45" "Trial03_KRLr3_46" "Trial03_KRLr3_47"
-# # [10] "Trial03_KRLr3_48" "Trial03_KRLr3_49" "Trial03_KRLr3_50"
-# # [13] "Trial03_KRLr3_51" "Trial03_KRLr3_52" "Trial03_KRLr3_53"
-# # [16] "Trial03_KRLr3_54" "Trial03_KRLr3_55" "Trial03_KRLr3_56"
-# # [19] "Trial03_KRLr3_57"
-# Trial3Animals <- 19
-# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
-# 
-# 
-# T3dRESPmsr90_treatmentquery_CHG <- filter(T3dRESPmsr90, Treatment == "CHG")
-# unique(T3dRESPmsr90_treatmentquery_CHG$KrillID)
-# # [1] "Trial03_KRLr3_42"
-# # [2] "Trial03_KRLr3_46"
-# # [3] "Trial03_KRLr3_48"
-# # [4] "Trial03_KRLr3_53"
-# # [5] "Trial03_KRLr3_56"
-# Trial3_CHG <- 5
-# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
-# 
-# T3dRESPmsr90_treatmentquery_CUR <- filter(T3dRESPmsr90, Treatment == "CUR")
-# unique(T3dRESPmsr90_treatmentquery_CUR$KrillID)
-# # [1] "Trial03_KRLr3_41"
-# # [2] "Trial03_KRLr3_47"
-# # [3] "Trial03_KRLr3_51"
-# # [4] "Trial03_KRLr3_57"
-# Trial3_CUR <- 4
-# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
-# 
-# T3dRESPmsr90_treatmentquery_TMP <- filter(T3dRESPmsr90, Treatment == "TMP")
-# unique(T3dRESPmsr90_treatmentquery_TMP$KrillID)
-# # [1] "Trial03_KRLr3_39" "Trial03_KRLr3_40" "Trial03_KRLr3_44"
-# # [4] "Trial03_KRLr3_45" "Trial03_KRLr3_49" "Trial03_KRLr3_50"
-# # [7] "Trial03_KRLr3_54"
-# # [8] "Trial03_KRLr3_55"
-# Trial3_TMP <- 8
-# #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
-# 
-# T3dRESPmsr90_treatmentquery_blank <- filter(T3dRESPmsr90, Treatment == "blank")
-# unique(T3dRESPmsr90_treatmentquery_blank$KrillID)
-# # [1] "Trial03_KRLr3_43"
-# # [2] "Trial03_KRLr3_52"
-# 
-# Trial3_Blanks <- 2
-# trial3Table <- data.frame(Trial3Animals, Trial3_CHG, Trial3_CUR, Trial3_TMP, Trial3_Blanks)
-# write.csv(trial3Table, "2021.03.05_RespirometryTrial03Table.csv")
-# 
-# unique(T3dRESPmsr90$KrillID)
-# unique(T4dRESPmsr90$KrillID)
-# 
-# 
-# #*********************************
-# ## Trial # 4
-# #*********************************
-# unique(T4dRESPmsr90$KrillID)
-# #  [1] "Trial04_KRLr4_58" "Trial04_KRLr4_59" "Trial04_KRLr4_62"
-# #  [4] "Trial04_KRLr4_65" "Trial04_KRLr4_67" "Trial04_KRLr4_68"
-# #  [7] "Trial04_KRLr4_69" "Trial04_KRLr4_70" "Trial04_KRLr4_71"
-# # [10] "Trial04_KRLr4_75"
-# # [11] "Trial04_KRLr4_76"
-# Trial4Animals <- 11
-# 
-# T4dRESPmsr90_treatmentquery_CHG <- filter(T4dRESPmsr90, Treatment == "CHG")
-# unique(T4dRESPmsr90_treatmentquery_CHG$KrillID)
-# # [1] "Trial04_KRLr4_70"
-# Trial4_CHG <- 1
-# 
-# T4dRESPmsr90_treatmentquery_CUR <- filter(T4dRESPmsr90, Treatment == "CUR")
-# unique(T4dRESPmsr90_treatmentquery_CUR$KrillID)
-# # [1] "Trial04_KRLr4_58" "Trial04_KRLr4_62" "Trial04_KRLr4_65"
-# # [4] "Trial04_KRLr4_67" "Trial04_KRLr4_71" "Trial04_KRLr4_75"
-# # [7] "Trial04_KRLr4_76"
-# Trial4_CUR <- 7
-# 
-# T4dRESPmsr90_treatmentquery_TMP <- filter(T4dRESPmsr90, Treatment == "TMP")
-# unique(T4dRESPmsr90_treatmentquery_TMP$KrillID)
-# Trial4_TMP <- 0
-# 
-# T4dRESPmsr90_treatmentquery_blank <- filter(T4dRESPmsr90, Treatment == "blank")
-# unique(T4dRESPmsr90_treatmentquery_blank$KrillID)
-# # [1] "Trial04_KRLr4_59"
-# # [2] "Trial04_KRLr4_68"
-# # [3] "Trial04_KRLr4_69"
-# 
-# Trial4_Blanks <- 2
-# trial4Table <- data.frame(Trial4Animals, Trial4_CHG, Trial4_CUR, Trial4_TMP, Trial4_Blanks)
-# write.csv(trial4Table, "2021.03.05_RespirometryTrial04Table.csv")
-
-
-
-```
-
-
-## 7.1a) Oxygen Plot
+## 7.) Oxygen Plots
 ```{r 7.1a)  Oxygen Plot, warning=FALSE}
 
 oxPLOT1 <- dRESPmsr_90 %>%
@@ -968,7 +722,7 @@ dRESPmsr_90 <- subset( dRESPmsr_90, select = -c(User,
                                          Sequence,
                                          FileName))
 
-write.csv(dRESPmsr_90, "KRL_ADLT_EXPOcross_RespirometryDataframe_Summer2019_2021.03.29
+write.csv(dRESPmsr_90, "KRL_ADLT_EXPOcross_RespirometryDataframe_Summer2019_2021.04.30
 .csv")
 
 ```
