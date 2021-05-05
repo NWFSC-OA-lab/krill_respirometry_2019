@@ -594,11 +594,9 @@ dRESPmsr$assumedSatDOmg <- oxySol(dRESPmsr$CorTemp,
 dRESPmsr$percentDOassumpt <- dRESPmsr$Value / dRESPmsr$assumedSatDOmg
 
 dRESPmsr$obseveredSatDOmg <- oxySol(dRESPmsr$CorTemp, dRESPmsr$SalinityConstant)
-
 dRESPmsr$percentDO <- dRESPmsr$Value / dRESPmsr$assumedSatDOmg
 
 dRESPmsr$actualDOmg <- dRESPmsr$percentDO * dRESPmsr$obseveredSatDOmg
-
 names(dRESPmsr)
 
 #|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
@@ -606,15 +604,16 @@ names(dRESPmsr)
 dRESPmsr$assumed_vialVol <- ""
 dRESPmsr$assumed_vialVol <- 0.02806 #liters (rather than 28.06mL)
 
-dRESPmsr$unique_vialVol <- ""
 
+dRESPmsr$unique_vialVol <- ""
 dRESPmsr$Size <- as.numeric(dRESPmsr$Size)
 
 
 # volume assuming krill have a density of 1 ml/g.
 dRESPmsr$krilldensity <- ""
 dRESPmsr$krilldensity <- as.numeric(dRESPmsr$krilldensity)
-dRESPmsr$krilldensity <- ifelse(dRESPmsr$MOATS=="blank", 0, (dRESPmsr$Size) * 0.001)
+dRESPmsr$krilldensity <- ifelse(dRESPmsr$MOATS=="blank", 0, 
+                                (dRESPmsr$Size) * 0.001)
 
 
 dRESPmsr$unique_vialVol <- 0.02806 - dRESPmsr$krilldensity

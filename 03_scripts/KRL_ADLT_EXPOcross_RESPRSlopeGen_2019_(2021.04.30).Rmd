@@ -478,7 +478,7 @@ dSlopes$CorrWeightSlope <- dSlopes$CorrSlope/dSlopes$WetWeight
 ```{r 12.1a) Boxplot of Corrected Slopes, warning=FALSE}
 
 dSlopes<- droplevels(filter(dSlopes, Treatment != "n/a"))
-
+dSlopes$CorrWeightSlope <- abs(dSlopes$CorrWeightSlope)
 
 slopeplot3 <- ggplot(dSlopes, aes(Treatment, CorrWeightSlope)) +
             geom_jitter(color = "grey") +
@@ -486,7 +486,7 @@ slopeplot3 <- ggplot(dSlopes, aes(Treatment, CorrWeightSlope)) +
             # facet_wrap(~TrialID) +
             xlab("Treatment") +
             ylab("µg O2 h-1 g-1") +
-            ggtitle("Corrected Oxygen Consumption Slopes by Treatment (Vial Oxygen (µg)/hr per gram of Krill)") +
+            ggtitle("Corrected Oxygen Consumption Slopes by Treatment (Oxygen (µg)/hr per Krill gram)") +
             theme_bw()
 
 slopeplot3
@@ -515,7 +515,7 @@ dSlopes.summary
 
 kable(dSlopes.summary, digits = 4)
 
-write.csv(dSlopes.summary, "KRL_ADLT_EXPOcross_dSlopeSummaryStats_2021.03.30.csv")
+write.csv(dSlopes.summary, "KRL_ADLT_EXPOcross_dSlopeSummaryStats_2021.05.04.csv")
 ```
 
 
@@ -603,51 +603,12 @@ dSlopes<- droplevels(filter(dSlopes, Treatment != "n/a"))
 
 ### 16.a) 1hr Dataframe - LMER
 ```{r, 16.a) 1hr Dataframe - LMER}
-
 lmer.dSlopes <- lmer(CorrWeightSlope ~ Treatment + (1|MOATS), data = dSlopes)
 summary(lmer.dSlopes)
 # All Change Against Current 
 # All Change Against High Temperature
 ```
 No Treatment Effect Found
-Random Effects Model variance accounting for a possible MOATs effect remains significantly small.
-No treatment effect observed. 
-Neither correlation or T values between "All Change(CHG)" to "Current(CUR)" and "High Temperature(TMP)" 
-This model doesn't consider High Temperature directly against Current
-Model re-ogranized/re-leveled below
-
-
-The Current Conditions to Hight Temperature comparison did not display a treatment effect. 
-
-Possible reasons for the variance include only 51 animals in trial, there are not enough observations to smooth the slopes. 
-16 animals from the "All Change" treatment were in included across four trials.
-20 animals from the "Current" treatment were in included across four trials.
-16 animals from the "High Temperarure" treatment were in included across four trials.
-(totals only 52 animals)
-
-so signal over the noise- why?
-
-1hr may not have allowed enough observations to show a disernable difference across treatments.
-However, Krill could just be proving to be a robust organism, able to withstand a cross stress environment. 
-It's more likely that sample size was small.
-
-
-
-When comparing Current against "High Temperature" and "All Change" the T values remain small but the TMP to CUR is somewhat larger. 
-
-Still, no discernible treatment effect, no discernible MOATS effect. 
-
-
-The variance around a MOATs effect remains significantly small in this 70% Threshold dataset.
-No treatment effect observed.
-Model re-organized/re-leveled below to compare "Current" against "High Temperature" directly
-
-
-No discernible treatment effect, no discernible MOATS effect. 
-None of the "threshold confined" datasets displayed a MOATs or Treatment Effect.
-
-
-Below shows the comparison is slopes values when all data points were considered. 
 
 
 # 17.) All Points "dSlopes" Dataframe - LMER
@@ -670,7 +631,7 @@ Model re-organized/re-leveled below to compare "Current" against "High Temperatu
 
 levels(dSlopes$Treatment)
 
-dSlopes$Treatment <- fct_relevel(dSlopes$Treatment, "CHG")
+dSlopes$Treatment <- fct_relevel(dSlopes$Treatment, "CUR")
 lmer.dSlopes <- lmer(CorrWeightSlope ~ Treatment + (1|MOATS), data = dSlopes)
 summary(lmer.dSlopes)
 
