@@ -558,9 +558,9 @@ error bars +/- SD shown in blue
 error bars(CI) +/- our confidence intervals- shown in red
 
 
-
 # 15.) Descriptive Statisitics 
 ```{r 15.) Descriptive Statisitics}
+
 library(tidyr)
 #Remove NAs
 #krill <- na.omit(krill)
