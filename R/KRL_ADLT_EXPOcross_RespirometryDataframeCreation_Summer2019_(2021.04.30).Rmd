@@ -105,8 +105,8 @@ library(metacsv)
 ## 2.) Creating the initial Dataframe, dRESP
 #*********************************
 # Fitbox4 PRESENSOR raw data 
-dRESP <- read_csv(here::here("01_rawData","KRILL_Resp_alltrials.csv"))
-write_meta_template(dRESP, here::here("01_rawData","KRILL_Resp_alltrials.csv"),
+dRESP <- read_csv(here::here("data_raw","KRILL_Resp_alltrials.csv"))
+write_meta_template(dRESP, here::here("data_raw","KRILL_Resp_alltrials.csv"),
                             embedded = TRUE)
 
 
@@ -114,9 +114,9 @@ write_meta_template(dRESP, here::here("01_rawData","KRILL_Resp_alltrials.csv"),
 
 
 # dRESPanimal represents just the animal, vial, MOATs, etc.  
-dRESPanimal <- read_csv(here::here("01_rawData","RespirometryTrials_all.Animal.Info.csv"))
+dRESPanimal <- read_csv(here::here("data_raw","RespirometryTrials_all.Animal.Info.csv"))
 dRESPanimal <- droplevels(filter(dRESPanimal, Treatment != "AMB"))
-write_meta_template(dRESPanimal, here::here("01_rawData","RespirometryTrials_all.Animal.Info.csv"),
+write_meta_template(dRESPanimal, here::here("data_raw","RespirometryTrials_all.Animal.Info.csv"),
                             embedded = TRUE)
 
 
@@ -515,7 +515,7 @@ dRESPmsr[order(dRESPmsr$Time),]
 # per minute unit
 dRESPmsr$delta_t <- (dRESPmsr$delta_t)/60
 
-dRESPmsr$Unit <- as.character(dRESPmsr$Unit)
+#dRESPmsr$Unit <- as.character(dRESPmsr$Unit)
 dRESPmsr$Unit <- "hour"
 
 ```
@@ -617,7 +617,7 @@ dRESPmsr$krilldensity <- ifelse(dRESPmsr$MOATS=="blank", 0,
 
 
 dRESPmsr$unique_vialVol <- 0.02806 - dRESPmsr$krilldensity
-oxygen <- unique_vialVol * dRESPmsr$actualDOmg   
+oxygen <- dRESPmsr$unique_vialVol * dRESPmsr$actualDOmg   
 ##mg per liter is the units for Oxygen per vial
 
 dRESPmsr$oxygen <- oxygen * 1000

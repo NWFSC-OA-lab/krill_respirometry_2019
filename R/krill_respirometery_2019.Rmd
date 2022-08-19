@@ -1,0 +1,145 @@
+---
+title: "Krill 2019 Respirometry"
+output:
+  html_document:
+    code_folding: hide
+    df_print: paged
+    highlight: tango
+    theme: cerulean
+    toc: yes
+    toc_depth: 4
+    toc_float: yes
+  word_document:
+    toc: yes
+    toc_depth: '4'
+editor_options:
+  chunk_output_type: console
+---
+# Load libraries
+```{r libraries}
+library(tidyverse)
+library(here)
+library(janitor)
+```
+# Read and clean data
+```{r read-and-clean-data}
+#vial_volume in liters
+vial_vol <- 0.02806
+
+d_resp <- read_csv(here("data_raw", "KRILL_Resp_alltrials.csv")) %>%
+  clean_names() %>%
+  select(date, time, sensor_name, delta_t, value, temp) %>%
+  rename(krill_id = sensor_name,
+         oxygen = value) %>%
+  mutate(oxygen = as.numeric(oxygen)) %>%
+  #Convert from mg/L to ug/vial
+  mutate(oxygen = oxygen  * 0.02806 * 1000) %>%
+  # convert delta_t from minutes to hours
+  mutate(delta_t = delta_t / 60) %>%
+  #remove some crazy values at the end of one run
+  filter(oxygen < 1000)
+```
+#Correct for mis-entered temperature data
+#TODO fix this
+
+# Plot oxygen curves
+```{r oxygen-curves}
+d_resp %>%
+  ggplot(aes(delta_t, oxygen)) +
+    geom_point(aes(color = krill_id)) 
+```
+# Slope without outliers function
+```{r slope-no-outlier-fun}
+slope_no_outlier_fun <- function(x, y){
+  d <- data.frame(x,y)
+  m <- lm(y~x, data = d)
+  sample_size <- nrow(d)
+  d_filter <- d %>%
+    mutate(cooksd = cooks.distance(m)) %>%
+    mutate(outlier = if_else(cooksd > 4 /sample_size, TRUE, FALSE)) %>%
+    filter(!outlier)
+  m_filter <- lm(y~x, data = d_filter)
+  return(m_filter$coefficients[2])
+}
+```
+
+# Calcluate slopes
+```{r calc-slopes}
+
+#hours of acclimation 
+acclim_t <- 10/60
+#duration of exposure (hours)
+duration <- 1.5
+
+d_slopes <- d_resp %>%
+  filter(delta_t > acclim_t) %>%
+  filter(delta_t < duration) %>%
+  group_by(krill_id) %>%
+  summarise(oxy_slope = slope_no_outlier_fun(delta_t, oxygen))
+
+```
+# Plot oxygen slopes by krill
+```{r oxy-slope-plot}
+d_slopes %>%
+  ggplot(aes(krill_id, oxy_slope)) +
+    geom_point()
+```
+# Read krill info
+```{r read-krill-info}
+d_krill <- read_csv(here("data_raw", "RespirometryTrials_all.Animal.Info.csv")) %>%
+  clean_names() %>%
+  rename(krill_id = sensor_name)
+```
+# Merge slopes and krill info
+```{r merge-slopes-and-info}
+d_slope_krill <- d_krill %>%
+  full_join(d_slopes, by = "krill_id")
+```
+# Get blanks data frame
+Average slope over the two blanks per trial
+```{r blanks-data}
+d_blanks <- d_slope_krill %>%
+  filter(moats == "blank") %>%
+  group_by(trial_id) %>%
+  summarise(blank_oxy_slope = mean(oxy_slope))
+```
+# Complete data frame
+Assign blanks to krill trial do blank corrections
+Standardize by size
+```{r complete-data}
+d <- d_slope_krill %>%
+  left_join(d_blanks, by = "trial_id") %>%
+  filter(moats != "blank") %>%
+  #subtract the blanks
+  mutate(oxy_slope_blank_adj = oxy_slope - blank_oxy_slope) %>%
+  mutate(size = as.numeric(size)) %>%
+  mutate(oxy_slope_blank_size_adj = oxy_slope_blank_adj / size) %>%
+  # units of oxy_slope_blank_size_adj are mg of O2 per minute removed from vial per gram of krill
+  # conver to ug of O2 consummed per hour per gram of krill
+  mutate(repsiration = -(oxy_slope_blank_size_adj)) %>%
+  #remove ambient treatment
+  filter(treatment != "AMB")
+```
+
+# Poster plot
+```{r poster-plot}
+# oceans in high so2 poster plot
+
+d %>%
+  filter(repsiration > 0 ) %>%
+  mutate(Treatment = factor(treatment, levels = c("CUR", "TMP", "CHG"))) %>%
+  ggplot(aes(Treatment, repsiration, color = Treatment)) +
+  geom_boxplot(notch = FALSE, outlier.shape = NA) + 
+  geom_jitter(shape=16, position=position_jitter(width = 0.2, height = 0), size = 2) +
+  scale_color_manual(values = c("mediumblue", "orange1", "limegreen")) +
+  scale_x_discrete(labels = c("Current Ocean", "Heat Wave", "Future Ocean")) +
+  xlab("Treatment") + 
+  ylab(expression(Respiration~(µg~O[2]~h^-1~g^-1))) +
+  theme_bw(base_size = 32) +
+  theme(legend.position="none")
+
+ggsave(here("figs", "krill_respiration_poster.jpeg"))
+
+```
+
+

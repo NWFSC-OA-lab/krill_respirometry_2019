@@ -106,10 +106,10 @@ library(metacsv)
 #*********************************
 
 
-dResp90 <- read_csv(here::here("02_processedData","KRL_ADLT_EXPOcross_RespirometryDataframe_Summer2019_2021.04.30.csv"))
+dResp90 <- read_csv(here::here("data","KRL_ADLT_EXPOcross_RespirometryDataframe_Summer2019_2021.04.30.csv"))
 
 
-dRESPanimal <- read_csv(here::here("01_rawData","RespirometryTrials_all.Animal.Info.csv"))
+dRESPanimal <- read_csv(here::here("data_raw","RespirometryTrials_all.Animal.Info.csv"))
 
 
 dim(dRESPanimal)
